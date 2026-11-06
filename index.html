@@ -586,7 +586,7 @@ function cleanTitle(rest, isAnniv){
       else i = j - 1;
     }
   }
-  const s = out.join(" ").replace(/\s+/g," ").trim();
+  const s = out.join(" ").replace(/\s+/g," ").replace(/^[\s:;,.\-–—]+|[\s:;,\-–—]+$/g,"").trim();
   return { title: fixNames(cap(s)), client };
 }
 
