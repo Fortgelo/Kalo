@@ -239,13 +239,13 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .logincard .small a{color:var(--muted)}
 .login[hidden]{display:none}
 
-.day{margin:2px 0 14px}
-.dayhead{width:100%;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px 10px;color:var(--fg);font-size:13.5px;text-align:left}
-.dayhead:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
-.dmeta{color:var(--muted);font-family:"Geist Mono",monospace;font-size:12px}
-.dbar{grid-column:1/-1;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.mday{position:relative;margin-left:auto;order:2}
+.dayhead{font-family:inherit;display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--fg);font-size:12.5px;white-space:nowrap}
+.dayhead:hover,.dayhead[aria-expanded="true"]{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.dmeta{color:var(--muted);font-family:"Geist Mono",monospace;font-size:11.5px}
+.dbar{width:38px;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
 .dbar i{display:block;height:100%;background:var(--c-perso);border-radius:99px;transition:width .25s}
-.daybody{margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.daybody{position:absolute;right:0;top:calc(100% + 8px);width:min(360px,calc(100vw - 32px));z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 12px 12px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
 .dnav{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12.5px;padding:2px 2px 6px}
 .dnav b{font-weight:500;color:var(--fg)}
 .dnav button{background:none;border:0;color:var(--muted);font-size:18px;padding:0 8px;line-height:1}
@@ -258,9 +258,10 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .dt.done .dtx,.dt.done .dh{text-decoration:line-through;color:var(--muted);opacity:.7}
 .ddel{background:none;border:0;color:var(--muted);font-size:18px;padding:0 4px;opacity:.6}
 .dform{display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
-.dform input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:8px 10px;font-size:14px}
-.dform button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:0 14px;font-weight:600}
+.dform input{font-family:inherit;flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:8px 10px;font-size:14px}
+.dform button{font-family:inherit;background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:0 14px;font-weight:600}
 .dnote{margin:8px 2px 2px;font-size:12px;color:var(--warn)}
+header.top{flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -270,6 +271,7 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
       <h1 class="brand">Kalo<span>.</span></h1>
       <div class="today-label" id="todayLabel"></div>
     </div>
+    <div class="mday" id="day"></div>
     <div class="seg view" role="group" aria-label="Vue">
       <button id="vList" aria-pressed="true">À venir</button>
       <button id="vMonth" aria-pressed="false">Mois</button>
@@ -283,8 +285,6 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
     </div>
     <div class="preview" id="preview" aria-live="polite"></div>
   </form>
-
-  <section class="day" id="day" aria-label="Ma journée"></section>
 
   <div class="tools">
     <label class="search" for="s"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -695,7 +695,8 @@ function fromG(g){
 function gErr(e){
   if (e && e.status === 403 && /accessNotConfigured|has not been used/i.test(JSON.stringify(e.body || {}))) showToast("L'API Google Agenda n'est pas activée pour cette appli.");
   else if (e && (e.status === 401 || e.message === "auth" || e.message === "popup_closed" || e.message === "popup_failed_to_open")) showToast("Reconnecte-toi à Google pour synchroniser.", "Se connecter", signIn);
-  else showToast("Pas pu synchroniser avec Google, réessaie.");
+  else { const er = e && e.body && e.body.error; const d = [e && e.status, er && (er.errors && er.errors[0] && er.errors[0].reason || er.status || er.message)].filter(Boolean).join(" ");
+    showToast("Pas pu synchroniser avec Google" + (d ? " (" + String(d).slice(0, 60) + ")" : "") + ", réessaie."); }
 }
 function enqueue(job){
   pending++; renderG();
@@ -758,7 +759,7 @@ async function signIn(){
 }
 async function start(){
   $("login").hidden = true;
-  try { const c = await api("/calendars/primary"); account = c.id || ""; } catch (e) { gErr(e); }
+  try { const c = await api("/calendars/primary"); account = c.id || ""; } catch (e) { /* adresse affichée seulement : pas d'alerte */ }
   await refresh(); renderG();
 }
 function signOut(){
@@ -771,7 +772,7 @@ function signOut(){
 /* ---------- Ma journée ---------- */
 const TK = "kalo-tasks";
 let D = []; try { D = JSON.parse(lsGet(TK) || "[]"); } catch {}
-let dFile = null, dOK = true, dOpen = lsGet("kalo-dopen") === "1", dDay = iso(today()), dSaveT = null;
+let dFile = null, dOK = true, dOpen = false, dDay = iso(today()), dSaveT = null;
 const dSave_ = () => lsSet(TK, JSON.stringify(D));
 const dLive = d => D.filter(x => x.d === d && !x.x).sort((a,b) => (a.h || "99:99").localeCompare(b.h || "99:99") || a.u - b.u);
 async function dFetch(url, opt = {}, retry = true){
@@ -830,8 +831,9 @@ function dayRender(){
   const now = new Date(), isT = dDay === iso(today()), nowS = pad(now.getHours()) + ":" + pad(now.getMinutes());
   const lbl = isT ? "Aujourd'hui" : pISO(dDay).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
   const bar = `<span class="dbar"><i style="width:${pct}%"></i></span>`;
-  let h = `<button type="button" class="dayhead" id="dayToggle" aria-expanded="${dOpen}"><span>${list.length ? (pct === 100 ? "Journée terminée ✓" : "Ma journée") : "Planifier ma journée"}</span>`
-        + `<span class="dmeta">${list.length ? `${done}/${list.length} · ${pct}%` : "+"}</span>${bar}</button>`;
+  let h = `<button type="button" class="dayhead" id="dayToggle" aria-expanded="${dOpen}" title="Ma journée">`
+        + (list.length ? `<span class="dlab">${pct === 100 ? "✓ Terminé" : "Ma journée"}</span>${bar}<span class="dmeta">${done}/${list.length}</span>` : `<span class="dlab">+ Ma journée</span>`)
+        + `</button>`;
   if (dOpen) {
     h += `<div class="daybody"><div class="dnav"><button type="button" data-dn="-1" aria-label="Jour précédent">‹</button><b>${esc(lbl)}</b><button type="button" data-dn="1" aria-label="Jour suivant">›</button></div>`;
     h += list.map(x => {
@@ -849,12 +851,14 @@ function dayRender(){
 }
 $("day").addEventListener("click", e => {
   const t = e.target.closest("button"); if (!t) return;
-  if (t.id === "dayToggle") { dOpen = !dOpen; lsSet("kalo-dopen", dOpen ? "1" : "0"); dayRender(); if (dOpen) $("dayIn")?.focus(); return; }
+  if (t.id === "dayToggle") { dOpen = !dOpen; dayRender(); if (dOpen) $("dayIn")?.focus(); return; }
   if (t.dataset.dn) { dDay = iso(addDays(pISO(dDay), +t.dataset.dn)); dayRender(); return; }
   if (t.dataset.dt) { const x = D.find(y => y.id === t.dataset.dt); if (x) { x.done = !x.done; x.u = Date.now(); daySave(); } return; }
   if (t.dataset.dx) { const x = D.find(y => y.id === t.dataset.dx); if (x) { x.x = true; x.u = Date.now(); daySave(); } }
 });
 $("day").addEventListener("submit", e => { e.preventDefault(); const i = $("dayIn"); const v = i.value; i.value = ""; dAdd(v); $("dayIn")?.focus(); });
+document.addEventListener("pointerdown", e => { if (dOpen && !e.target.closest("#day")) { dOpen = false; dayRender(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && dOpen) { dOpen = false; dayRender(); } });
 dayRender();
 
 /* ---------- Occurrences ---------- */
