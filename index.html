@@ -243,7 +243,7 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .logincard .small a{color:var(--muted)}
 .login[hidden]{display:none}
 
-.day{position:relative;margin-left:auto;order:2}
+.mday{position:relative;margin-left:auto;order:2}
 .dayhead{display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--fg);font-size:12.5px;white-space:nowrap}
 .dayhead:hover,.dayhead[aria-expanded="true"]{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 .dmeta{color:var(--muted);font-family:"Geist Mono",monospace;font-size:11.5px}
@@ -267,6 +267,26 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .drec{font-style:normal;color:var(--muted);font-size:12px}
 .dnote{margin:8px 2px 2px;font-size:12px;color:var(--warn)}
 header.top{flex-wrap:wrap}
+
+.fsbtn{order:3;width:32px;height:32px;display:inline-grid;place-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;color:var(--muted);padding:0;margin-left:8px}
+.fsbtn:hover{color:var(--fg);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.fsbtn svg{width:15px;height:15px}
+
+.fsbtn#miniBtn{order:3}
+@media (max-width:560px){
+  .seg.view{display:inline-flex;order:4;margin-top:2px;margin-left:auto}
+  #fsBtn{display:none}
+  header.top{gap:8px}
+  .listcol[hidden],.monthcol[hidden]{display:none!important}
+  header.top{padding-block:12px 8px}
+  .grid{gap:16px}
+}
+@media (max-height:560px){
+  .next{display:none}
+  header.top{padding-block:8px 6px}
+  .composer{padding-block:4px 8px}
+  .tools{margin-bottom:10px}
+}
 </style>
 </head>
 <body>
@@ -276,7 +296,9 @@ header.top{flex-wrap:wrap}
       <h1 class="brand">Kalo<span>.</span></h1>
       <div class="today-label" id="todayLabel"></div>
     </div>
-    <div class="day" id="day"></div>
+    <div class="mday" id="day"></div>
+    <button type="button" class="fsbtn" id="miniBtn" title="Fenêtre réduite" aria-label="Fenêtre réduite" hidden></button>
+    <button type="button" class="fsbtn" id="fsBtn" title="Plein écran" aria-label="Plein écran" hidden></button>
     <div class="seg view" role="group" aria-label="Vue">
       <button id="vList" aria-pressed="true">À venir</button>
       <button id="vMonth" aria-pressed="false">Mois</button>
@@ -769,7 +791,7 @@ async function refresh(){
 function renderG(){
   const s = $("gState"), b = $("signOut"); if (!s) return;
   if (!online && !hasToken()) { s.textContent = ""; b.hidden = true; return; }
-  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""} · v3`;
+  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""} · v5`;
   b.hidden = false;
 }
 function showLogin(mode){
@@ -914,6 +936,35 @@ document.addEventListener("pointerdown", e => { if (dOpen && !e.target.closest("
 document.addEventListener("keydown", e => { if (e.key === "Escape" && dOpen) { dOpen = false; dayRender(); } });
 dayRender();
 
+
+/* ---------- Plein écran ---------- */
+(() => {
+  const b = $("fsBtn"); if (!b || !document.fullscreenEnabled) return;
+  const IN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+  const OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+  const upd = () => { const on = !!document.fullscreenElement; b.innerHTML = on ? OUT : IN; b.title = on ? "Quitter le plein écran" : "Plein écran"; b.setAttribute("aria-label", b.title); };
+  b.hidden = false; upd();
+  b.addEventListener("click", () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); });
+  document.addEventListener("fullscreenchange", upd);
+})();
+
+
+/* ---------- Fenêtre réduite ---------- */
+(() => {
+  const b = $("miniBtn"); if (!b || !matchMedia("(hover:hover)").matches) return;
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="12" height="14" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2"/></svg>';
+  b.hidden = false;
+  let prev = null;
+  b.addEventListener("click", () => {
+    if (!matchMedia("(display-mode: standalone)").matches && !matchMedia("(display-mode: window-controls-overlay)").matches) { showToast("Réduis la fenêtre à la main : Kalo s'adapte tout seul."); return; }
+    try {
+      if (!prev && outerWidth > 560) { prev = [outerWidth, outerHeight]; resizeTo(420, Math.min(780, screen.availHeight - 40)); }
+      else if (prev) { resizeTo(prev[0], prev[1]); prev = null; }
+      else showToast("Agrandis la fenêtre à la main pour revenir à la vue complète.");
+    } catch { showToast("Réduis la fenêtre à la main : Kalo s'adapte tout seul."); }
+  });
+})();
+
 /* ---------- Occurrences ---------- */
 const rep = ev => ev.repeat || (ev.yearly ? "year" : null);
 const lastDay = (y,m) => new Date(y,m+1,0).getDate();
@@ -1039,7 +1090,7 @@ function renderList(){
   const up = all.filter(([e,o]) => o.end >= t).sort((a,b) => a[1].start - b[1].start || (a[0].time||"99").localeCompare(b[0].time||"99"));
   const past = all.filter(([e,o]) => o.end < t).sort((a,b) => b[1].start - a[1].start);
 
-  const nxt = up.find(([e,o]) => ["sortie","voyage","anniv"].includes(e.cat) && diff(o.start,t) >= 1 && diff(o.start,t) <= 120);
+  const nxt = up.find(([e,o]) => (!["pro","admin"].includes(e.cat) || e.couple) && diff(o.start,t) >= 1 && diff(o.start,t) <= 120);
   if (nxt) {
     const [e,o] = nxt, c = CATS[e.cat], n = diff(o.start,t);
     $("nextCard").innerHTML = `<div class="next" data-id="${esc(e.id)}" style="--c:${c.c}" role="button" tabindex="0">
