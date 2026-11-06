@@ -485,7 +485,15 @@ function parse(raw){
     const d = new Date(Date.now() + mins*60000); relDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()); time = `${pad(d.getHours())}:${pad(d.getMinutes())}`; start = relDate; return true; });
   // plage : du 20 au 22 décembre / 20 déc au 22 / 20-22 déc
   take(new RegExp("(?:\\bdu\\s+)?(?<![\\d/])(\\d{1,2})(?:er)?(?:\\s+"+MRE+")?(?:\\s+(\\d{4}))?\\s*(?:au|-|jusqu'?au)\\s*(\\d{1,2})(?:er)?(?![\\dh:])(?:\\s+"+MRE+")?(?:\\s+(\\d{4}))?","g"), m => {
-    const m1 = MONTHS[m[2]||m[5]], m2 = MONTHS[m[5]||m[2]]; if (!m1) return false;
+    let m1 = MONTHS[m[2]||m[5]], m2 = MONTHS[m[5]||m[2]];
+    if (!m1) { // « du 09 au 17 » sans mois : prochain mois où le jour de début est à venir
+      if (!/^du\s/.test(m[0])) return false;
+      const d1 = +m[1], d2 = +m[4]; let s0 = null;
+      for (let k = 0; k <= 12 && !s0; k++) { const x = new Date(t.getFullYear(), t.getMonth() + k, d1); if (x.getDate() === d1 && x >= t) s0 = x; }
+      if (!s0 || d2 < 1 || d2 > 31) return false;
+      let e0 = new Date(s0.getFullYear(), s0.getMonth(), d2); if (e0.getDate() !== d2 || e0 < s0) e0 = new Date(s0.getFullYear(), s0.getMonth() + 1, d2);
+      if (e0.getDate() !== d2) return false; start = s0; end = e0; return true;
+    }
     const y = year(m[3]||m[6]);
     const s = y ? mkDate(y,m1,+m[1]) : future(m1,+m[1]); if (!s) return false;
     let e = mkDate(s.getFullYear(),m2,+m[4]); if (e && e < s) e = mkDate(s.getFullYear()+1,m2,+m[4]);
