@@ -22,7 +22,7 @@
   --bg:#0d0f13; --surface:#151820; --surface-2:#1c2029; --line:#262b35;
   --fg:#eceef3; --muted:#8b92a1; --faint:#5c6372;
   --accent:#b3c0ff; --accent-ink:#0d0f13; --warn:#f1c46b; --danger:#f08a8a;
-  --c-anniv:#f58fbd; --c-sortie:#f5a65b; --c-voyage:#6ea8fe; --c-pro:#a58bf7;
+  --c-couple:#f2555f; --c-anniv:#f58fbd; --c-sortie:#f5a65b; --c-voyage:#6ea8fe; --c-pro:#a58bf7;
   --c-sante:#4fd1c5; --c-admin:#e6c75a; --c-perso:#a3d95b;
   --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --f-body:"Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -58,6 +58,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .preview{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:26px;align-items:center}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
 .chip.title{color:var(--fg);font-weight:500}
+button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover{color:var(--fg)}
 .chip.missing{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--c, var(--c-perso))}
 
@@ -237,6 +238,29 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .logincard .small{font-size:12px;color:var(--faint);margin:16px 0 0}
 .logincard .small a{color:var(--muted)}
 .login[hidden]{display:none}
+
+.day{margin:2px 0 14px}
+.dayhead{width:100%;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px 10px;color:var(--fg);font-size:13.5px;text-align:left}
+.dayhead:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.dmeta{color:var(--muted);font-family:"Geist Mono",monospace;font-size:12px}
+.dbar{grid-column:1/-1;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.dbar i{display:block;height:100%;background:var(--c-perso);border-radius:99px;transition:width .25s}
+.daybody{margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.dnav{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12.5px;padding:2px 2px 6px}
+.dnav b{font-weight:500;color:var(--fg)}
+.dnav button{background:none;border:0;color:var(--muted);font-size:18px;padding:0 8px;line-height:1}
+.dt{display:flex;align-items:center;gap:10px;padding:7px 2px;border-top:1px solid var(--line)}
+.dchk{width:22px;height:22px;flex:none;border-radius:50%;border:1.5px solid var(--muted);background:none;color:var(--accent-ink);font-size:13px;line-height:1;padding:0}
+.dt.done .dchk{background:var(--c-perso);border-color:var(--c-perso)}
+.dh{min-width:44px;font-family:"Geist Mono",monospace;font-size:12px;color:var(--muted)}
+.dh.late{color:var(--warn)}
+.dtx{flex:1;font-size:14px;overflow-wrap:anywhere}
+.dt.done .dtx,.dt.done .dh{text-decoration:line-through;color:var(--muted);opacity:.7}
+.ddel{background:none;border:0;color:var(--muted);font-size:18px;padding:0 4px;opacity:.6}
+.dform{display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
+.dform input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:8px 10px;font-size:14px}
+.dform button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:0 14px;font-weight:600}
+.dnote{margin:8px 2px 2px;font-size:12px;color:var(--warn)}
 </style>
 </head>
 <body>
@@ -259,6 +283,8 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
     </div>
     <div class="preview" id="preview" aria-live="polite"></div>
   </form>
+
+  <section class="day" id="day" aria-label="Ma journée"></section>
 
   <div class="tools">
     <label class="search" for="s"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -289,7 +315,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
       </div>
     </section>
   </div>
-  <div class="gbar" id="gBar"><span id="gState" aria-live="polite">Chargement…</span><button type="button" id="signOut" hidden>Se déconnecter</button></div>
+  <div class="gbar" id="gBar"><span id="gState" aria-live="polite">Chargement…</span><button type="button" id="partnerBtn">♥ Couple</button><button type="button" id="signOut" hidden>Se déconnecter</button></div>
 </div>
 
 <div class="backdrop" id="backdrop" hidden></div>
@@ -340,7 +366,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 <script>
 (() => {
 const CATS = {
-  anniv:{label:"Anniversaire",c:"var(--c-anniv)"}, sortie:{label:"Sortie",c:"var(--c-sortie)"},
+  couple:{label:"Couple",c:"var(--c-couple)"}, anniv:{label:"Anniversaire",c:"var(--c-anniv)"}, sortie:{label:"Sortie",c:"var(--c-sortie)"},
   voyage:{label:"Voyage",c:"var(--c-voyage)"}, pro:{label:"Pro",c:"var(--c-pro)"},
   sante:{label:"Santé",c:"var(--c-sante)"}, admin:{label:"Admin",c:"var(--c-admin)"}, perso:{label:"Perso",c:"var(--c-perso)"}
 };
@@ -412,6 +438,9 @@ function fixTypos(raw){
   return raw;
 }
 
+function partnerNames(){
+  try { return (localStorage.getItem("kalo-partner") || "").split(/[,;]+/).map(x => deacc(x.trim().toLowerCase())).filter(Boolean); } catch { return []; }
+}
 function parse(raw){
   raw = fixTypos(raw);
   const t = today(), thisY = t.getFullYear();
@@ -478,14 +507,36 @@ function parse(raw){
   let cat = "perso";
   if (isAnniv) cat = "anniv"; else for (const [k,re] of CAT_RULES) if (re.test(norm)) { cat = k; break; }
   if (client) cat = "pro";
+  let couple = false;
+  { const pn = partnerNames(); if (pn.length) { const ws = new Set(words); couple = pn.some(x => ws.has(x)); } }
+  if (couple && cat === "perso") cat = "couple";
   if (repeat && !start) start = t;
   const ev = { title, cat, date: start ? iso(start) : null, end: end ? iso(end) : null, time, repeat, yearly: repeat === "year", birthYear };
   if (cat === "pro") { ev.client = client || ""; ev.status = "encours"; }
+  if (couple) ev.couple = true;
   return ev;
 }
 
 const cap = w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 const vowel = w => /^[aeiouyhéèêàâîôû]/i.test(w);
+const nm = x => x.toLowerCase().replace(/(^|[-'’ ])(\p{L})/gu, (m,a,b) => a + b.toUpperCase());
+const FAMILY = new Set(["maman","papa","mamie","mami","mamy","papi","papie","papy","tonton","tata","parrain","marraine","frere","soeur","nanas"]);
+const ACR = new Set(["pdf","tva","sms","rdv","ia","ai","rh","cv","uk","usa","tgv","rer","ps5","ps4","cdi","cdd","url","api","hd","4k","vf","vo","vip","ok"]);
+const NAME_PREP = new Set(["avec","chez","pour","et","&","a","à","de","du","d'"]);
+function fixNames(title){
+  const pn = (typeof partnerNames === "function") ? partnerNames() : [];
+  const toks = title.split(" ");
+  return toks.map((tk, i) => {
+    const prev = i ? deacc(toks[i-1].toLowerCase()) : "";
+    return tk.split(/(&)/).map(part => {
+      const k = deacc(part.toLowerCase());
+      if (!/\p{L}/u.test(part)) return part;
+      if (FAMILY.has(k) || pn.includes(k)) return nm(part);
+      if (NAME_PREP.has(prev) && /^[A-ZÀ-ÝÇ'’-]{2,}$/.test(part) && !ACR.has(k)) return nm(part);
+      return part;
+    }).join("");
+  }).join(" ");
+}
 function cleanTitle(rest, isAnniv){
   let w = rest.replace(/[,;]+/g," ").split(/\s+/).filter(Boolean);
   const n = x => deacc(x.toLowerCase());
@@ -496,7 +547,7 @@ function cleanTitle(rest, isAnniv){
     while (w.length && ["de","du","d'"].includes(n(w[0]))) w.shift();
     if (w[0] && /^d'/i.test(w[0])) w[0] = w[0].slice(2);
     trim();
-    const names = w.map(x => ["et","&"].includes(n(x)) ? "et" : cap(x)).join(" ");
+    const names = w.map(x => ["et","&"].includes(n(x)) ? "et" : nm(x)).join(" ");
     return { title: names ? `Anniversaire ${vowel(names) ? "d'" : "de "}${names}` : "Anniversaire", client: "" };
   }
   const out = []; let client = "";
@@ -505,7 +556,7 @@ function cleanTitle(rest, isAnniv){
     if ((k === "disney" || k === "disneyland")) { out.push("Disneyland Paris"); if (w[i+1] && n(w[i+1]) === "paris") i++; continue; }
     if ((k === "rdv" || k === "rendez-vous") && w[i+1] && PROS[n(w[i+1])]) { const p = PROS[n(w[i+1])]; out.push("rendez-vous", "chez", vowel(p) ? "l'"+p : "le "+p); i++; continue; }
     if (k === "chez" && w[i+1] && PROS[n(w[i+1])]) { const p = PROS[n(w[i+1])]; out.push("chez", vowel(p) ? "l'"+p : "le "+p); i++; continue; }
-    if (k === "avec") { out.push("avec"); while (w[i+1] && !STOP.has(n(w[i+1])) || (w[i+1] && n(w[i+1]) === "et" && w[i+2])) { i++; out.push(n(w[i]) === "et" ? "et" : cap(w[i])); } continue; }
+    if (k === "avec") { out.push("avec"); while (w[i+1] && !STOP.has(n(w[i+1])) || (w[i+1] && n(w[i+1]) === "et" && w[i+2])) { i++; out.push(n(w[i]) === "et" ? "et" : nm(w[i])); } continue; }
     out.push(DICT[k] ?? w[i]);
     // après un mot du métier (rendu, livraison, call…), le mot suivant est souvent le client
     if (PRO_KW.has(k) && !client) {
@@ -517,13 +568,13 @@ function cleanTitle(rest, isAnniv){
     }
   }
   const s = out.join(" ").replace(/\s+/g," ").trim();
-  return { title: cap(s), client };
+  return { title: fixNames(cap(s)), client };
 }
 
 /* ---------- Données : Google Agenda ---------- */
 let events = new Map();
 const CFG = window.KALO_CONFIG || {};
-const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const SCOPE = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.appdata";
 const API = "https://www.googleapis.com/calendar/v3";
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris"; } catch { return "Europe/Paris"; } })();
 const known = new Set();
@@ -619,7 +670,7 @@ const remText = ev => reminders(ev).map(r => RT[r.minutes]).join(" + ");
 function toG(ev){
   const b = { summary: ev.title, status: "confirmed", description: ev.note || "",
     reminders: { useDefault: false, overrides: reminders(ev) },
-    extendedProperties: { private: { kalo: "1", cat: ev.cat || "perso", client: ev.client || "", status: ev.status || "", birth: ev.birthYear ? String(ev.birthYear) : "", raw: (ev.raw || "").slice(0, 200) } } };
+    extendedProperties: { private: { kalo: "1", cat: ev.cat || "perso", client: ev.client || "", status: ev.status || "", couple: ev.couple ? "1" : "", birth: ev.birthYear ? String(ev.birthYear) : "", raw: (ev.raw || "").slice(0, 200) } } };
   if (gAllDay(ev)) { b.start = { date: ev.date }; b.end = { date: iso(addDays(pISO(ev.end || ev.date), 1)) }; }
   else {
     const s = new Date(`${ev.date}T${ev.time}:00`), e = new Date(+s + 36e5);
@@ -632,7 +683,7 @@ function toG(ev){
 function fromG(g){
   const p = g.extendedProperties?.private || {};
   const sd = g.start?.date || (g.start?.dateTime || "").slice(0, 10); if (!sd) return null;
-  const ev = { id: g.id, title: g.summary || "Sans titre", cat: CATS[p.cat] ? p.cat : "perso", date: sd, note: g.description || "", createdAt: g.created, updatedAt: g.updated };
+  const ev = { id: g.id, title: g.summary || "Sans titre", cat: CATS[p.cat] ? p.cat : "perso", date: sd, couple: p.couple === "1", note: g.description || "", createdAt: g.created, updatedAt: g.updated };
   if (g.start.dateTime) ev.time = g.start.dateTime.slice(11, 16);
   if (g.start.date && g.end?.date) { const e = iso(addDays(pISO(g.end.date), -1)); if (e > sd) ev.end = e; }
   const rr = (g.recurrence || []).find(x => x.startsWith("RRULE"));
@@ -685,7 +736,7 @@ async function loadAll(){
 }
 async function refresh(){
   if (pending || !hasToken()) return;
-  try { events = await loadAll(); online = true; cacheSave(); render(); } catch (e) { if (e.status) gErr(e); }
+  try { events = await loadAll(); online = true; cacheSave(); render(); dayLoad(); } catch (e) { if (e.status) gErr(e); }
 }
 function renderG(){
   const s = $("gState"), b = $("signOut"); if (!s) return;
@@ -713,8 +764,98 @@ async function start(){
 function signOut(){
   try { if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token, () => {}); } catch {}
   token = null; tokenExp = 0; online = false; account = ""; events = new Map(); known.clear();
-  lsDel(SK); lsDel("kalo-signed"); lsDel(RK); lsDel(CK); render(); renderG(); showLogin("first");
+  lsDel(SK); lsDel("kalo-signed"); lsDel(RK); lsDel(CK); lsDel("kalo-tasks"); dFile = null; D = []; dayRender(); render(); renderG(); showLogin("first");
 }
+
+
+/* ---------- Ma journée ---------- */
+const TK = "kalo-tasks";
+let D = []; try { D = JSON.parse(lsGet(TK) || "[]"); } catch {}
+let dFile = null, dOK = true, dOpen = lsGet("kalo-dopen") === "1", dDay = iso(today()), dSaveT = null;
+const dSave_ = () => lsSet(TK, JSON.stringify(D));
+const dLive = d => D.filter(x => x.d === d && !x.x).sort((a,b) => (a.h || "99:99").localeCompare(b.h || "99:99") || a.u - b.u);
+async function dFetch(url, opt = {}, retry = true){
+  const t = await ensureToken();
+  const r = await fetch("https://www.googleapis.com" + url, { ...opt, headers: { Authorization: "Bearer " + t, ...(opt.headers || {}) } });
+  if (r.status === 401 && retry) { token = null; tokenExp = 0; lsDel(SK); return dFetch(url, opt, false); }
+  if (!r.ok) { const e = new Error("drive " + r.status); e.status = r.status; throw e; }
+  return r;
+}
+function dMerge(remote){
+  const m = new Map(D.map(x => [x.id, x]));
+  for (const r of remote || []) { const l = m.get(r.id); if (!l || (r.u || 0) > (l.u || 0)) m.set(r.id, r); }
+  const lim = iso(addDays(today(), -45));
+  D = [...m.values()].filter(x => x.d >= lim);
+  dSave_();
+}
+async function dPut(){
+  const body = JSON.stringify(D);
+  if (dFile) { await dFetch(`/upload/drive/v3/files/${dFile}?uploadType=media`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body }); return; }
+  const b = "kalo" + Date.now();
+  const mp = `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: "kalo-tasks.json", parents: ["appDataFolder"] })}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`;
+  const r = await dFetch("/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=" + b }, body: mp });
+  dFile = (await r.json()).id;
+}
+async function dayLoad(){
+  if (!hasToken()) { dayRender(); return; }
+  try {
+    if (!dFile) {
+      const r = await dFetch("/drive/v3/files?spaces=appDataFolder&q=" + encodeURIComponent("name='kalo-tasks.json'") + "&fields=files(id)");
+      dFile = ((await r.json()).files || [])[0]?.id || null;
+    }
+    let remote = [];
+    if (dFile) remote = await (await dFetch(`/drive/v3/files/${dFile}?alt=media`)).json();
+    const before = JSON.stringify(remote); dMerge(remote);
+    if (!dFile || JSON.stringify(D) !== before) await dPut();
+    dOK = true;
+  } catch (e) { if (e.status) dOK = false; }
+  dayRender();
+}
+function daySave(){ dSave_(); dayRender(); clearTimeout(dSaveT); dSaveT = setTimeout(async () => { if (!hasToken()) return; try { await dPut(); dOK = true; } catch (e) { if (e.status) dOK = false; dayRender(); } }, 700); }
+function dAdd(txt){
+  let n = 0;
+  for (const part of txt.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean)) {
+    const m = part.match(/(?:\s+(?:à|a|vers))?\s*(\d{1,2})\s*(?:h|:)\s*(\d{2})?(?!\d)/i);
+    let h = "", t = part;
+    if (m && +m[1] < 24 && +(m[2] || 0) < 60) { h = pad(+m[1]) + ":" + pad(+(m[2] || 0)); t = (part.slice(0, m.index) + " " + part.slice(m.index + m[0].length)).trim(); }
+    t = t.replace(/\s+/g, " ").replace(/^(?:à|a|vers)\s+/i, "");
+    if (!t) continue;
+    D.push({ id: uid(), d: dDay, t: t[0].toUpperCase() + t.slice(1), h, done: false, u: Date.now() + n++ });
+  }
+  if (n) daySave();
+}
+function dayRender(){
+  const el = $("day"); if (!el) return;
+  const list = dLive(dDay), done = list.filter(x => x.done).length, pct = list.length ? Math.round(done / list.length * 100) : 0;
+  const now = new Date(), isT = dDay === iso(today()), nowS = pad(now.getHours()) + ":" + pad(now.getMinutes());
+  const lbl = isT ? "Aujourd'hui" : pISO(dDay).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  const bar = `<span class="dbar"><i style="width:${pct}%"></i></span>`;
+  let h = `<button type="button" class="dayhead" id="dayToggle" aria-expanded="${dOpen}"><span>${list.length ? (pct === 100 ? "Journée terminée ✓" : "Ma journée") : "Planifier ma journée"}</span>`
+        + `<span class="dmeta">${list.length ? `${done}/${list.length} · ${pct}%` : "+"}</span>${bar}</button>`;
+  if (dOpen) {
+    h += `<div class="daybody"><div class="dnav"><button type="button" data-dn="-1" aria-label="Jour précédent">‹</button><b>${esc(lbl)}</b><button type="button" data-dn="1" aria-label="Jour suivant">›</button></div>`;
+    h += list.map(x => {
+      const late = isT && !x.done && x.h && x.h < nowS;
+      return `<div class="dt${x.done ? " done" : ""}"><button type="button" class="dchk" data-dt="${x.id}" aria-pressed="${x.done}" aria-label="Fait">${x.done ? "✓" : ""}</button>`
+        + `<span class="dh${late ? " late" : ""}">${x.h ? x.h.replace(":", "h") : ""}</span><span class="dtx">${esc(x.t)}</span><button type="button" class="ddel" data-dx="${x.id}" aria-label="Supprimer">×</button></div>`;
+    }).join("");
+    h += `<form id="dayForm" class="dform"><input id="dayIn" type="text" placeholder="lessive 15h, rendre le projet 18h…" autocomplete="off" enterkeyhint="done"><button type="submit">Ajouter</button></form>`;
+    if (!dOK) h += `<p class="dnote">Pas de synchro entre appareils pour l'instant. Retire Kalo sur myaccount.google.com/permissions puis reconnecte-toi une fois.</p>`;
+    h += `</div>`;
+  }
+  const keep = dOpen && document.activeElement && document.activeElement.id === "dayIn" ? $("dayIn").value : null;
+  el.innerHTML = h;
+  if (keep !== null) { const i = $("dayIn"); i.value = keep; i.focus(); }
+}
+$("day").addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.id === "dayToggle") { dOpen = !dOpen; lsSet("kalo-dopen", dOpen ? "1" : "0"); dayRender(); if (dOpen) $("dayIn")?.focus(); return; }
+  if (t.dataset.dn) { dDay = iso(addDays(pISO(dDay), +t.dataset.dn)); dayRender(); return; }
+  if (t.dataset.dt) { const x = D.find(y => y.id === t.dataset.dt); if (x) { x.done = !x.done; x.u = Date.now(); daySave(); } return; }
+  if (t.dataset.dx) { const x = D.find(y => y.id === t.dataset.dx); if (x) { x.x = true; x.u = Date.now(); daySave(); } }
+});
+$("day").addEventListener("submit", e => { e.preventDefault(); const i = $("dayIn"); const v = i.value; i.value = ""; dAdd(v); $("dayIn")?.focus(); });
+dayRender();
 
 /* ---------- Occurrences ---------- */
 const rep = ev => ev.repeat || (ev.yearly ? "year" : null);
@@ -774,6 +915,7 @@ function evRow(ev, o){
   if (o.end > o.start) meta.push(esc(dateLabel(ev,o)));
   if (ev.time) meta.push(esc(ev.time.replace(":","h")));
   if (rep(ev) === "year" && ev.birthYear) meta.push(`${o.start.getFullYear() - ev.birthYear} ans`);
+  if (ev.couple && ev.cat !== "couple") meta.push("♥ couple");
   if (ev.cat === "pro" && ev.client) meta.push(esc(ev.client));
   meta.push(`<span style="display:inline-flex;gap:5px;align-items:center"><span class="dot" style="--c:${c.c}"></span>${c.label}</span>`);
   if (ev.cat === "pro" && ev.status && ev.status !== "encours") meta.push(`<span class="st ${ev.status}">${ev.status === "livre" ? "Livré · à encaisser" : "Payé"}</span>`);
@@ -786,7 +928,7 @@ function evRow(ev, o){
 }
 
 let filter = "all", query = "";
-const visible = () => [...events.values()].filter(e => filter === "all" || e.cat === filter);
+const visible = () => [...events.values()].filter(e => filter === "all" || e.cat === filter || (filter === "couple" && e.couple));
 const matches = (e, q) => deacc([e.title, e.note, e.client, e.raw, (CATS[e.cat]||{}).label].join(" ").toLowerCase()).includes(q);
 
 function renderTodayBar(){
@@ -885,10 +1027,13 @@ function render(){
 }
 
 /* ---------- Saisie rapide ---------- */
-let draft = null;
+let draft = null, catOver = null, catOpen = false, coupOver = null;
 function updatePreview(){
   const v = $("q").value.trim();
   draft = v ? parse(v) : null;
+  if (!v) { catOver = null; catOpen = false; coupOver = null; }
+  if (draft && coupOver !== null) { draft.couple = coupOver || undefined; if (!coupOver && draft.cat === "couple") draft.cat = "perso"; if (coupOver && draft.cat === "perso") draft.cat = "couple"; }
+  if (draft && catOver && CATS[catOver]) { draft.cat = catOver; if (catOver === "couple") draft.couple = true; }
   $("addBtn").disabled = !draft || !draft.title;
   if (!draft) { $("preview").innerHTML = ""; return; }
   const c = CATS[draft.cat];
@@ -898,14 +1043,23 @@ function updatePreview(){
   const RL = {year:"chaque année", month:"chaque mois", week:"chaque semaine"};
   if (draft.repeat) chips.push(`<span class="chip">${RL[draft.repeat]}${draft.birthYear ? ` · ${occ(draft).start.getFullYear()-draft.birthYear} ans` : ""}</span>`);
   if (draft.client) chips.push(`<span class="chip">Client : ${esc(draft.client)}</span>`);
-  chips.push(`<span class="chip"><span class="dot" style="--c:${c.c}"></span>${c.label}</span>`);
+  if (catOpen) chips.push(Object.entries(CATS).map(([k,x]) => `<button type="button" class="chip catpick" data-pick="${k}" style="${k===draft.cat?"color:var(--fg);border-color:var(--muted)":""}"><span class="dot" style="--c:${x.c}"></span>${x.label}</button>`).join(""));
+  else chips.push(`<button type="button" class="chip catpick" data-pick="open" title="Changer la catégorie"><span class="dot" style="--c:${c.c}"></span>${c.label} <span style="opacity:.6">▾</span></button>`);
+  chips.push(`<button type="button" class="chip catpick" data-pick="couple" title="Marquer comme couple" style="${draft.couple ? "color:var(--c-couple);border-color:var(--c-couple)" : "opacity:.55"}">♥ Couple</button>`);
   $("preview").innerHTML = chips.join("");
 }
+$("preview").addEventListener("mousedown", e => { if (e.target.closest("[data-pick]")) e.preventDefault(); });
+$("preview").addEventListener("click", e => {
+  const b = e.target.closest("[data-pick]"); if (!b) return;
+  if (b.dataset.pick === "couple") { coupOver = !(draft && draft.couple); }
+  else if (b.dataset.pick === "open") catOpen = true; else { catOver = b.dataset.pick; catOpen = false; }
+  updatePreview(); $("q").focus();
+});
 $("q").addEventListener("input", updatePreview);
 $("composer").addEventListener("submit", e => {
   e.preventDefault(); if (!draft || !draft.title) return;
   const ev = { id: uid(), raw: $("q").value.trim(), ...draft, note: "", createdAt: new Date().toISOString() };
-  $("q").value = ""; updatePreview();
+  $("q").value = ""; catOver = null; catOpen = false; coupOver = null; updatePreview();
   if (!ev.date) { ev.date = iso(today()); openSheet(ev, true); return; }
   put(ev);
   const o = occ(ev); mCursor = new Date(o.start.getFullYear(), o.start.getMonth(), 1); selDay = o.start; render();
@@ -1037,7 +1191,7 @@ Tu réponds UNIQUEMENT avec un objet JSON : {"reply": string, "actions": array}.
 - {"op":"update","id":string,"changes":{mêmes champs que event, seulement ceux qui changent}}
 - {"op":"delete","ids":[string,...]}
 - {"op":"delete_all"} pour tout effacer.
-cat parmi : anniv, sortie, voyage, pro, sante, admin, perso. Un anniversaire = cat "anniv", repeat "year", titre "Anniversaire de Prénom". Titres courts, bien écrits, sans la date. client et status seulement pour cat "pro" ("livre" = livré mais pas encore payé).
+cat parmi : couple, anniv, sortie, voyage, pro, sante, admin, perso. Un anniversaire = cat "anniv", repeat "year", titre "Anniversaire de Prénom". Titres courts, bien écrits, sans la date. client et status seulement pour cat "pro" ("livre" = livré mais pas encore payé).
 N'utilise que des id présents dans la liste fournie. "next" est la prochaine occurrence, "passed" indique un événement terminé. Calcule les dates à partir de la date du jour donnée.
 Si la demande est ambiguë, pose une courte question dans reply, sans action.`;
 
@@ -1172,6 +1326,13 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("chat")
 
 /* ---------- Démarrage ---------- */
 $("fab").hidden = false;
+$("partnerBtn").addEventListener("click", () => {
+  const cur = lsGet("kalo-partner") || "";
+  const v = prompt("Prénom de ta partenaire (ou partenaire/s, séparés par une virgule).\nLes événements qui le contiennent iront dans Couple :", cur);
+  if (v === null) return;
+  if (v.trim()) lsSet("kalo-partner", v.trim()); else lsDel("kalo-partner");
+  updatePreview(); showToast(v.trim() ? "Prénom enregistré" : "Prénom retiré");
+});
 $("signOut").addEventListener("click", () => { if (confirm("Se déconnecter de Kalo sur cet appareil ?")) signOut(); });
 try { (JSON.parse(lsGet(CK) || "[]")).forEach(e => events.set(e.id, e)); } catch {}
 render(); renderG();
@@ -1191,6 +1352,7 @@ document.addEventListener("pointerdown", () => {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
 window.addEventListener("online", refresh);
 setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 90000);
+setInterval(() => dayRender(), 60000);
 setInterval(() => { if (iso(today()) !== $("todayLabel").dataset.d) { $("todayLabel").dataset.d = iso(today()); render(); } }, 60000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
