@@ -172,6 +172,10 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .todaybar button:hover{text-decoration:underline}
 .todaybar .t{font-family:var(--f-mono);color:var(--muted);font-size:12.5px}
 .todaybar .q{color:var(--muted)}
+.moneyrow{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px;width:100%;margin:-14px 0 22px;padding:9px 14px;background:none;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:12.5px;text-align:left;font-family:inherit}
+.moneyrow b{color:var(--fg);font-weight:500;font-variant-numeric:tabular-nums}
+.moneyrow i{margin-left:auto;font-style:normal;opacity:.6}
+.moneyrow:hover{border-color:var(--muted)}
 .propanel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:22px}
 .propanel div{background:var(--surface);padding:12px 14px;min-width:0}
 .propanel b{display:block;font:700 24px/1 var(--f-display);color:var(--c-pro);font-variant-numeric:tabular-nums}
@@ -239,8 +243,8 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .logincard .small a{color:var(--muted)}
 .login[hidden]{display:none}
 
-.mday{position:relative;margin-left:auto;order:2}
-.dayhead{font-family:inherit;display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--fg);font-size:12.5px;white-space:nowrap}
+.day{position:relative;margin-left:auto;order:2}
+.dayhead{display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--fg);font-size:12.5px;white-space:nowrap}
 .dayhead:hover,.dayhead[aria-expanded="true"]{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 .dmeta{color:var(--muted);font-family:"Geist Mono",monospace;font-size:11.5px}
 .dbar{width:38px;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
@@ -258,8 +262,9 @@ button.chip.catpick{cursor:pointer;font-family:inherit}button.chip.catpick:hover
 .dt.done .dtx,.dt.done .dh{text-decoration:line-through;color:var(--muted);opacity:.7}
 .ddel{background:none;border:0;color:var(--muted);font-size:18px;padding:0 4px;opacity:.6}
 .dform{display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
-.dform input{font-family:inherit;flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:8px 10px;font-size:14px}
-.dform button{font-family:inherit;background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:0 14px;font-weight:600}
+.dform input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:8px 10px;font-size:14px}
+.dform button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:0 14px;font-weight:600}
+.drec{font-style:normal;color:var(--muted);font-size:12px}
 .dnote{margin:8px 2px 2px;font-size:12px;color:var(--warn)}
 header.top{flex-wrap:wrap}
 </style>
@@ -271,7 +276,7 @@ header.top{flex-wrap:wrap}
       <h1 class="brand">Kalo<span>.</span></h1>
       <div class="today-label" id="todayLabel"></div>
     </div>
-    <div class="mday" id="day"></div>
+    <div class="day" id="day"></div>
     <div class="seg view" role="group" aria-label="Vue">
       <button id="vList" aria-pressed="true">À venir</button>
       <button id="vMonth" aria-pressed="false">Mois</button>
@@ -337,6 +342,7 @@ header.top{flex-wrap:wrap}
   <div class="row2 prof" id="proFields">
     <div class="field"><label for="fClient">Client</label><input id="fClient" type="text" placeholder="ex. 75PROD"></div>
     <div class="field"><label for="fStatus">Statut</label><select id="fStatus"><option value="encours">En cours</option><option value="livre">Livré, pas encore payé</option><option value="paye">Payé</option></select></div>
+    <div class="field"><label for="fAmount">Montant (€)</label><input id="fAmount" type="number" inputmode="decimal" min="0" step="any" placeholder="facultatif"></div>
   </div>
   <div class="field"><label for="fRepeat">Répéter</label><select id="fRepeat"><option value="">Jamais</option><option value="week">Chaque semaine</option><option value="month">Chaque mois</option><option value="year">Chaque année</option></select></div>
   <div class="field"><label for="fNote">Note</label><textarea id="fNote" placeholder="Idée cadeau, adresse, numéro de réservation…"></textarea></div>
@@ -395,7 +401,7 @@ const NOT_CLIENT = new Set(["client","clients","final","finale","finaux","v1","v
 const STOP = new Set(["le","la","les","du","au","aux","a","de","des","pour","ce","cette","prochain","prochaine","et","-","–","en","l'","d'",",","vers","le."]);
 const CAT_RULES = [
   ["sante",/\b(dentiste|medecin|docteur|doc|kine|ophtalmo|dermato|gyneco|osteo|vaccin|prise de sang|hopital|pharmacie|radio|psy|generaliste|analyses?)\b/],
-  ["pro",/\b(client|clients|reunion|reu|call|visio|rendu|rendus|deadline|livraison|livrer|devis|facture|facturer|brief|briefing|meeting|presentation|entretien|boulot|taf|travail|cowork|coworking|shooting|freelance|projet|mission|compo|compositing|render|rendering|retours|review|feedback|kickoff|kick-off|validation|relance|paiement|nuke|blender|houdini|maya|cinema 4d|c4d|unreal|substance|animatique|lookdev|modelisation|anim|vfx|motion|portfolio|salon|onboarding|urssaf)\b/],
+  ["pro",/\b(client|clients|reunion|reu|call|visio|rendu|rendus|deadline|livraison|livrer|devis|facture|facturer|brief|briefing|meeting|presentation|entretien|boulot|taf|travail|cowork|coworking|shooting|freelance|projet|mission|compo|compositing|render|rendering|retours|review|feedback|kickoff|kick-off|validation|relance|paiement|nuke|blender|houdini|maya|cinema 4d|c4d|unreal|substance|animatique|lookdev|modelisation|anim|vfx|motion|portfolio|salon|onboarding)\b/],
   ["admin",/\b(impots|urssaf|declaration|banque|loyer|caf|prefecture|passeport|papiers|assurance|mutuelle|edf|abonnement|resiliation|paiement|carte grise|controle technique|mairie)\b/],
   ["voyage",/\b(vol|avion|aeroport|train|tgv|vacances|voyage|sejour|hotel|airbnb|week-end|weekend|we|valise|road ?trip|ferry)\b/],
   ["sortie",/\b(disney|disneyland|parc asterix|resto|restau|restaurant|cine|cinema|concert|festival|soiree|apero|bar|match|parc|expo|musee|theatre|bowling|karaoke|diner|dej|dejeuner|brunch|potes|fete|teuf|escape|laser ?game|spectacle|boite)\b/]
@@ -443,6 +449,9 @@ function partnerNames(){
 }
 function parse(raw){
   raw = fixTypos(raw);
+  raw = raw.replace(/\bursaf+\b/gi, "Urssaf");
+  let amount = null;
+  raw = raw.replace(/(\d{1,3}(?:[ .]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:€|euros?|eur)(?![a-zA-Z])/i, (m, n, c) => { const v = parseFloat(n.replace(/[ .]/g, "") + (c ? "." + c : "")); if (isNaN(v) || v <= 0) return m; amount = v; return " "; });
   const t = today(), thisY = t.getFullYear();
   const norm = deacc(raw.toLowerCase());
   const cut = []; // [start,end)
@@ -460,6 +469,15 @@ function parse(raw){
   // chaque mois / toutes les semaines / chaque année
   take(/\b(?:chaque|tous les|toutes les)\s+(mois|ans?|annees?|semaines?)\b/g, m => { repeat = m[1] === "mois" ? "month" : m[1].startsWith("s") ? "week" : "year"; return true; });
   take(/\b(mensuel(?:le)?|hebdo(?:madaire)?|annuel(?:le)?)\b/g, m => { repeat = m[1].startsWith("m") ? "month" : m[1].startsWith("h") ? "week" : "year"; return true; });
+  // tous les 1er / chaque 15 / le 5 de chaque mois  → mensuel
+  take(/\b(?:(?:tous?|tout|toutes?|chaque)\s+(?:les\s+)?|le\s+)(\d{1,2})(?:er)?(?:\s+(?:de\s+)?(?:chaque\s+)?mois)?(?![\d:h\/]|\s*(?:min|mn|h\b|jours?|j\b|semaines?|sem\b|ans?|annees?|heures?))/g, m => {
+    if (!/tou|chaque/.test(m[0]) && !/mois/.test(m[0])) return false;
+    const n = +m[1]; if (n < 1 || n > 31) return false;
+    let d = null; for (let k = 0; k <= 4 && !d; k++) { const x = mkDate(t.getFullYear(), t.getMonth() + 1 + k, n); if (x && x >= t) d = x; }
+    if (!d) return false; repeat = "month"; start = d; return true; });
+  // tous les lundis / chaque vendredi  → hebdomadaire
+  take(/\b(?:tous?|tout|toutes?|chaque)\s+(?:les\s+)?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?\b/g, m => {
+    let d = new Date(t); while (d.getDay() !== WD[m[1]]) d = addDays(d,1); repeat = "week"; start = d; return true; });
   // dans 2min / dans 1h / dans 1h30 / dans une heure / dans une demi-heure
   take(/\bdans\s+(?:(\d+)\s*(?:h|heures?)(?:\s*(\d{1,2})(?!\d))?|(\d+)\s*(?:min|mn|minutes?)|(?:une?\s+)?demi[- ]?heure|(?:1\/2)\s*h|une?\s+heure)(?![a-z\d])/g, m => {
     let mins; if (m[1]) mins = +m[1]*60 + (+m[2]||0); else if (m[3]) mins = +m[3]; else if (/demi|1\/2/.test(m[0])) mins = 30; else mins = 60;
@@ -514,6 +532,7 @@ function parse(raw){
   const ev = { title, cat, date: start ? iso(start) : null, end: end ? iso(end) : null, time, repeat, yearly: repeat === "year", birthYear };
   if (cat === "pro") { ev.client = client || ""; ev.status = "encours"; }
   if (couple) ev.couple = true;
+  if (amount) ev.amount = amount;
   return ev;
 }
 
@@ -670,7 +689,7 @@ const remText = ev => reminders(ev).map(r => RT[r.minutes]).join(" + ");
 function toG(ev){
   const b = { summary: ev.title, status: "confirmed", description: ev.note || "",
     reminders: { useDefault: false, overrides: reminders(ev) },
-    extendedProperties: { private: { kalo: "1", cat: ev.cat || "perso", client: ev.client || "", status: ev.status || "", couple: ev.couple ? "1" : "", birth: ev.birthYear ? String(ev.birthYear) : "", raw: (ev.raw || "").slice(0, 200) } } };
+    extendedProperties: { private: { kalo: "1", cat: ev.cat || "perso", client: ev.client || "", status: ev.status || "", couple: ev.couple ? "1" : "", amount: ev.amount > 0 ? String(ev.amount) : "", birth: ev.birthYear ? String(ev.birthYear) : "", raw: (ev.raw || "").slice(0, 200) } } };
   if (gAllDay(ev)) { b.start = { date: ev.date }; b.end = { date: iso(addDays(pISO(ev.end || ev.date), 1)) }; }
   else {
     const s = new Date(`${ev.date}T${ev.time}:00`), e = new Date(+s + 36e5);
@@ -689,7 +708,7 @@ function fromG(g){
   const rr = (g.recurrence || []).find(x => x.startsWith("RRULE"));
   if (rr) { const m = rr.match(/FREQ=(YEARLY|MONTHLY|WEEKLY)/); if (m) ev.repeat = { YEARLY: "year", MONTHLY: "month", WEEKLY: "week" }[m[1]]; }
   ev.yearly = ev.repeat === "year";
-  if (p.client) ev.client = p.client; if (p.status) ev.status = p.status; if (p.birth) ev.birthYear = +p.birth; if (p.raw) ev.raw = p.raw;
+  if (p.amount) ev.amount = +p.amount; if (p.client) ev.client = p.client; if (p.status) ev.status = p.status; if (p.birth) ev.birthYear = +p.birth; if (p.raw) ev.raw = p.raw;
   return ev;
 }
 function gErr(e){
@@ -742,7 +761,7 @@ async function refresh(){
 function renderG(){
   const s = $("gState"), b = $("signOut"); if (!s) return;
   if (!online && !hasToken()) { s.textContent = ""; b.hidden = true; return; }
-  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""}`;
+  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""} · v3`;
   b.hidden = false;
 }
 function showLogin(mode){
@@ -774,7 +793,20 @@ const TK = "kalo-tasks";
 let D = []; try { D = JSON.parse(lsGet(TK) || "[]"); } catch {}
 let dFile = null, dOK = true, dOpen = false, dDay = iso(today()), dSaveT = null;
 const dSave_ = () => lsSet(TK, JSON.stringify(D));
-const dLive = d => D.filter(x => x.d === d && !x.x).sort((a,b) => (a.h || "99:99").localeCompare(b.h || "99:99") || a.u - b.u);
+const DOW = { lundi:1, mardi:2, mercredi:3, jeudi:4, vendredi:5, samedi:6, dimanche:0 };
+function recHit(r, d){ const dt = pISO(d); return r.d ? true : r.w ? r.w.includes(dt.getDay()) : r.m ? dt.getDate() === r.m : false; }
+function dLive(d){
+  const real = D.filter(x => x.d === d && !x.x && !x.rec);
+  const have = new Set(D.filter(x => x.d === d && x.tpl).map(x => x.id));
+  const virt = D.filter(x => x.rec && !x.x && x.d <= d && recHit(x.rec, d) && !have.has(x.id + "@" + d))
+    .map(x => ({ id: x.id + "@" + d, tpl: x.id, d, t: x.t, h: x.h, done: false, u: x.u, v: true }));
+  return [...real, ...virt].sort((a,b) => (a.h || "99:99").localeCompare(b.h || "99:99") || a.u - b.u);
+}
+function dGet(id){
+  let x = D.find(y => y.id === id); if (x) return x;
+  const [tid, day] = id.split("@"); const tp = D.find(y => y.id === tid && y.rec); if (!tp || !day) return null;
+  x = { id, tpl: tid, d: day, t: tp.t, h: tp.h, done: false, u: Date.now() }; D.push(x); return x;
+}
 async function dFetch(url, opt = {}, retry = true){
   const t = await ensureToken();
   const r = await fetch("https://www.googleapis.com" + url, { ...opt, headers: { Authorization: "Bearer " + t, ...(opt.headers || {}) } });
@@ -786,7 +818,7 @@ function dMerge(remote){
   const m = new Map(D.map(x => [x.id, x]));
   for (const r of remote || []) { const l = m.get(r.id); if (!l || (r.u || 0) > (l.u || 0)) m.set(r.id, r); }
   const lim = iso(addDays(today(), -45));
-  D = [...m.values()].filter(x => x.d >= lim);
+  D = [...m.values()].filter(x => x.rec || x.d >= lim);
   dSave_();
 }
 async function dPut(){
@@ -816,12 +848,21 @@ function daySave(){ dSave_(); dayRender(); clearTimeout(dSaveT); dSaveT = setTim
 function dAdd(txt){
   let n = 0;
   for (const part of txt.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean)) {
-    const m = part.match(/(?:\s+(?:à|a|vers))?\s*(\d{1,2})\s*(?:h|:)\s*(\d{2})?(?!\d)/i);
-    let h = "", t = part;
-    if (m && +m[1] < 24 && +(m[2] || 0) < 60) { h = pad(+m[1]) + ":" + pad(+(m[2] || 0)); t = (part.slice(0, m.index) + " " + part.slice(m.index + m[0].length)).trim(); }
+    let rec = null, rp = part;
+    { const nn = deacc(rp.toLowerCase()); let m0;
+      const cutp = m => { rp = (rp.slice(0, m.index) + " " + rp.slice(m.index + m[0].length)).trim(); };
+      if ((m0 = nn.match(/\b(?:tous les jours|chaque jour|quotidien(?:ne)?|tous les matins?|tous les soirs?)\b/))) { rec = { d: 1 }; cutp(m0); }
+      else if ((m0 = nn.match(/\b(?:tous?|tout|toutes?|chaque)\s+(?:les\s+)?((?:(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?(?:\s*(?:,|et|&)\s*)?)+)/))) {
+        rec = { w: [...new Set((m0[1].match(/lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche/g) || []).map(k => DOW[k]))] }; cutp(m0); }
+      else if ((m0 = nn.match(/\b(?:(?:tous?|tout|toutes?|chaque)\s+(?:les\s+)?|le\s+)(\d{1,2})(?:er)?(?:\s+(?:de\s+)?(?:chaque\s+)?mois)?(?![\d:h]|\s*(?:jours?|semaines?|ans?|heures?|min))/)) && (/tou|chaque/.test(m0[0]) || /mois/.test(m0[0])) && +m0[1] >= 1 && +m0[1] <= 31) { rec = { m: +m0[1] }; cutp(m0); }
+      else if ((m0 = nn.match(/\b(?:chaque|tous les)\s+mois\b/))) { rec = { m: pISO(dDay).getDate() }; cutp(m0); }
+    }
+    const m = rp.match(/(?:\s+(?:à|a|vers))?\s*(\d{1,2})\s*(?:h|:)\s*(\d{2})?(?!\d)/i);
+    let h = "", t = rp;
+    if (m && +m[1] < 24 && +(m[2] || 0) < 60) { h = pad(+m[1]) + ":" + pad(+(m[2] || 0)); t = (rp.slice(0, m.index) + " " + rp.slice(m.index + m[0].length)).trim(); }
     t = t.replace(/\s+/g, " ").replace(/^(?:à|a|vers)\s+/i, "");
     if (!t) continue;
-    D.push({ id: uid(), d: dDay, t: t[0].toUpperCase() + t.slice(1), h, done: false, u: Date.now() + n++ });
+    D.push({ id: uid(), d: dDay, t: t[0].toUpperCase() + t.slice(1), h, done: false, u: Date.now() + n++, ...(rec ? { rec } : {}) });
   }
   if (n) daySave();
 }
@@ -839,9 +880,9 @@ function dayRender(){
     h += list.map(x => {
       const late = isT && !x.done && x.h && x.h < nowS;
       return `<div class="dt${x.done ? " done" : ""}"><button type="button" class="dchk" data-dt="${x.id}" aria-pressed="${x.done}" aria-label="Fait">${x.done ? "✓" : ""}</button>`
-        + `<span class="dh${late ? " late" : ""}">${x.h ? x.h.replace(":", "h") : ""}</span><span class="dtx">${esc(x.t)}</span><button type="button" class="ddel" data-dx="${x.id}" aria-label="Supprimer">×</button></div>`;
+        + `<span class="dh${late ? " late" : ""}">${x.h ? x.h.replace(":", "h") : ""}</span><span class="dtx">${x.tpl ? '<em class="drec" title="Se répète">↻</em> ' : ""}${esc(x.t)}</span><button type="button" class="ddel" data-dx="${x.id}" aria-label="Supprimer">×</button></div>`;
     }).join("");
-    h += `<form id="dayForm" class="dform"><input id="dayIn" type="text" placeholder="lessive 15h, rendre le projet 18h…" autocomplete="off" enterkeyhint="done"><button type="submit">Ajouter</button></form>`;
+    h += `<form id="dayForm" class="dform"><input id="dayIn" type="text" placeholder="lessive 15h, sport tous les lundis 18h…" autocomplete="off" enterkeyhint="done"><button type="submit">Ajouter</button></form>`;
     if (!dOK) h += `<p class="dnote">Pas de synchro entre appareils pour l'instant. Retire Kalo sur myaccount.google.com/permissions puis reconnecte-toi une fois.</p>`;
     h += `</div>`;
   }
@@ -853,8 +894,12 @@ $("day").addEventListener("click", e => {
   const t = e.target.closest("button"); if (!t) return;
   if (t.id === "dayToggle") { dOpen = !dOpen; dayRender(); if (dOpen) $("dayIn")?.focus(); return; }
   if (t.dataset.dn) { dDay = iso(addDays(pISO(dDay), +t.dataset.dn)); dayRender(); return; }
-  if (t.dataset.dt) { const x = D.find(y => y.id === t.dataset.dt); if (x) { x.done = !x.done; x.u = Date.now(); daySave(); } return; }
-  if (t.dataset.dx) { const x = D.find(y => y.id === t.dataset.dx); if (x) { x.x = true; x.u = Date.now(); daySave(); } }
+  if (t.dataset.dt) { const x = dGet(t.dataset.dt); if (x) { x.done = !x.done; x.u = Date.now(); daySave(); } return; }
+  if (t.dataset.dx) {
+    const x = dGet(t.dataset.dx); if (!x) return;
+    if (x.tpl && confirm("Supprimer toute la répétition ?\nOK = toutes les occurrences · Annuler = seulement ce jour")) { const tp = D.find(y => y.id === x.tpl); if (tp) { tp.x = true; tp.u = Date.now(); } }
+    x.x = true; x.u = Date.now(); daySave();
+  }
 });
 $("day").addEventListener("submit", e => { e.preventDefault(); const i = $("dayIn"); const v = i.value; i.value = ""; dAdd(v); $("dayIn")?.focus(); });
 document.addEventListener("pointerdown", e => { if (dOpen && !e.target.closest("#day")) { dOpen = false; dayRender(); } });
@@ -952,12 +997,23 @@ function renderPro(){
   const week = pro.filter(e => { const o = occ(e); return o.end >= t && diff(o.start,t) <= 7; }).length;
   const unpaid = pro.filter(e => e.status === "livre");
   const next = pro.map(e => [e, occ(e)]).filter(([e,o]) => o.start >= t && e.status !== "paye" && /\b(rendu|livraison|deadline|livrer)\b/.test(deacc(e.title.toLowerCase()))).sort((a,b) => a[1].start - b[1].start)[0];
+  const money = pro.filter(e => e.amount > 0);
+  const sum = f => money.filter(f).reduce((a,e) => a + e.amount, 0);
+  const eur = v => v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €";
+  const ym = iso(t).slice(0,7);
+  const mrow = money.length ? `<button type="button" class="moneyrow" data-money aria-pressed="${showMoney}">`
+    + `<span>En cours <b>${showMoney ? eur(sum(e => (e.status || "encours") === "encours")) : "•••"}</b></span>`
+    + `<span>À encaisser <b>${showMoney ? eur(sum(e => e.status === "livre")) : "•••"}</b></span>`
+    + `<span>Encaissé (mois) <b>${showMoney ? eur(sum(e => e.status === "paye" && (e.date || "").slice(0,7) === ym)) : "•••"}</b></span>`
+    + `<i>${showMoney ? "masquer" : "afficher"}</i></button>` : "";
   $("proPanel").innerHTML = `<div class="propanel">
     <div><b>${week}</b><span>cette semaine</span></div>
     <div><b>${unpaid.length}</b><span>${unpaid.length ? esc(unpaid.slice(0,2).map(e => e.client || e.title).join(", ")) + (unpaid.length > 2 ? "…" : "") + " à encaisser" : "rien à encaisser"}</span></div>
     <div><b>${next ? (diff(next[1].start,t) === 0 ? "Auj." : "J-" + diff(next[1].start,t)) : "—"}</b><span>${next ? "prochain rendu · " + esc(next[0].client || next[0].title) : "aucun rendu prévu"}</span></div>
-  </div>`;
+  </div>${mrow}`;
 }
+let showMoney = false;
+$("proPanel").addEventListener("click", e => { if (e.target.closest("[data-money]")) { showMoney = !showMoney; renderPro(); } });
 
 function renderList(){
   const t = today();
@@ -1046,6 +1102,7 @@ function updatePreview(){
   if (draft.time) chips.push(`<span class="chip">${esc(draft.time.replace(":","h"))}</span>`);
   const RL = {year:"chaque année", month:"chaque mois", week:"chaque semaine"};
   if (draft.repeat) chips.push(`<span class="chip">${RL[draft.repeat]}${draft.birthYear ? ` · ${occ(draft).start.getFullYear()-draft.birthYear} ans` : ""}</span>`);
+  if (draft.amount) chips.push(`<span class="chip">${draft.amount.toLocaleString("fr-FR")} €</span>`);
   if (draft.client) chips.push(`<span class="chip">Client : ${esc(draft.client)}</span>`);
   if (catOpen) chips.push(Object.entries(CATS).map(([k,x]) => `<button type="button" class="chip catpick" data-pick="${k}" style="${k===draft.cat?"color:var(--fg);border-color:var(--muted)":""}"><span class="dot" style="--c:${x.c}"></span>${x.label}</button>`).join(""));
   else chips.push(`<button type="button" class="chip catpick" data-pick="open" title="Changer la catégorie"><span class="dot" style="--c:${c.c}"></span>${c.label} <span style="opacity:.6">▾</span></button>`);
@@ -1077,7 +1134,7 @@ function openSheet(ev, fresh = false){
   $("sTitle").textContent = fresh ? "Nouvel événement" : "Modifier";
   $("fTitle").value = cur.title || ""; $("fDate").value = cur.date || ""; $("fTime").value = cur.time || "";
   $("fEnd").value = cur.end || ""; $("fBirth").value = cur.birthYear || ""; $("fRepeat").value = rep(cur) || ""; $("fNote").value = cur.note || "";
-  $("fClient").value = cur.client || ""; $("fStatus").value = cur.status || "encours"; $("proFields").hidden = cur.cat !== "pro";
+  $("fClient").value = cur.client || ""; $("fAmount").value = cur.amount || ""; $("fStatus").value = cur.status || "encours"; $("proFields").hidden = cur.cat !== "pro";
   $("delBtn").hidden = fresh; $("delBtn").classList.remove("armed"); $("delBtn").textContent = "Supprimer";
   renderCats(); syncGcal();
   $("backdrop").hidden = false; $("sheet").hidden = false;
@@ -1092,14 +1149,14 @@ function readForm(){
   return {...cur, title: $("fTitle").value.trim() || "Sans titre", date: $("fDate").value || null, time: $("fTime").value || null,
     end: ($("fEnd").value && $("fEnd").value > $("fDate").value) ? $("fEnd").value : null,
     birthYear: +$("fBirth").value || null, repeat: $("fRepeat").value || null, yearly: $("fRepeat").value === "year", note: $("fNote").value.trim(),
-    ...(cur.cat === "pro" ? { client: $("fClient").value.trim(), status: $("fStatus").value } : {})};
+    ...(cur.cat === "pro" ? { client: $("fClient").value.trim(), status: $("fStatus").value, amount: (+$("fAmount").value > 0 ? +$("fAmount").value : undefined) } : {})};
 }
 function syncGcal(){
   const f = readForm();
   $("gNote").className = "gnote";
   $("gNote").textContent = `Synchronisé avec ton Google Agenda · rappels : ${remText(f)}.`;
 }
-["fTitle","fDate","fTime","fEnd","fRepeat","fBirth","fNote","fClient","fStatus"].forEach(id => $(id).addEventListener("input", syncGcal));
+["fTitle","fDate","fTime","fEnd","fRepeat","fBirth","fNote","fClient","fStatus","fAmount"].forEach(id => $(id).addEventListener("input", syncGcal));
 $("fCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; cur.cat = b.dataset.cat; if (cur.cat === "pro" && !cur.status) cur.status = "encours"; renderCats(); });
 $("saveBtn").addEventListener("click", () => {
   const ev = readForm(); if (!ev.date) { $("fDate").focus(); showToast("Choisis une date."); return; }
