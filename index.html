@@ -535,6 +535,42 @@ const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
 try { const s = JSON.parse(lsGet(SK) || "null"); if (s && s.exp > Date.now() + 60000) { token = s.t; tokenExp = s.exp; } } catch {}
 const hasToken = () => !!(token && Date.now() < tokenExp);
 const signedBefore = () => lsGet("kalo-signed") === "1";
+const AUTH = (CFG.authUrl || "").replace(/\/$/, "");
+const RK = "kalo-rt";
+let codeClient = null;
+async function authPost(path, body){
+  const r = await fetch(AUTH + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || "auth"); e.status = r.status; throw e; }
+  return j;
+}
+function storeTok(j){
+  token = j.access_token; tokenExp = Date.now() + (Number(j.expires_in || 3600) - 60) * 1000;
+  lsSet(SK, JSON.stringify({ t: token, exp: tokenExp })); lsSet("kalo-signed", "1");
+  if (j.refresh_token) lsSet(RK, j.refresh_token);
+}
+async function refreshWithRt(){
+  const rt = lsGet(RK); if (!AUTH || !rt) throw new Error("auth");
+  try { storeTok(await authPost("/refresh", { refresh_token: rt })); }
+  catch (e) { if (e.message === "invalid_grant") lsDel(RK); throw e; }
+  return token;
+}
+function requestCode(){
+  return new Promise((resolve, reject) => {
+    if (!codeClient) codeClient = google.accounts.oauth2.initCodeClient({ client_id: CFG.clientId, scope: SCOPE, ux_mode: "popup",
+      callback: r => tcb.ok && tcb.ok(r), error_callback: e => tcb.err && tcb.err(e) });
+    tcb = {
+      ok: async r => {
+        if (r.error || !r.code) return reject(new Error(r.error || "code"));
+        try { const j = await authPost("/token", { code: r.code }); storeTok(j);
+          if (!j.refresh_token && !lsGet(RK)) showToast("Connexion durable impossible : retire Kalo sur myaccount.google.com/permissions, puis reconnecte-toi.");
+          resolve(token); } catch (e) { reject(e); }
+      },
+      err: e => reject(new Error((e && e.type) || "popup"))
+    };
+    codeClient.requestCode();
+  });
+}
 
 function loadGsi(){
   return new Promise(res => {
@@ -557,6 +593,7 @@ function requestToken(prompt){
 }
 function ensureToken(){
   if (hasToken()) return Promise.resolve(token);
+  if (AUTH && lsGet(RK)) { if (!authWait) authWait = refreshWithRt().finally(() => { authWait = null; }); return authWait; }
   if (!window.google?.accounts?.oauth2) return Promise.reject(new Error("auth"));
   if (!authWait) authWait = requestToken("").finally(() => { authWait = null; });
   return authWait;
@@ -665,7 +702,7 @@ function showLogin(mode){
   else { b.hidden = false; b.onclick = signIn; }
 }
 async function signIn(){
-  try { await requestToken(""); await start(); }
+  try { await (AUTH ? requestCode() : requestToken("")); await start(); }
   catch (e) { showToast("Connexion annulée ou bloquée. Autorise les fenêtres pop-up pour Kalo."); }
 }
 async function start(){
@@ -676,7 +713,7 @@ async function start(){
 function signOut(){
   try { if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token, () => {}); } catch {}
   token = null; tokenExp = 0; online = false; account = ""; events = new Map(); known.clear();
-  lsDel(SK); lsDel("kalo-signed"); lsDel(CK); render(); renderG(); showLogin("first");
+  lsDel(SK); lsDel("kalo-signed"); lsDel(RK); lsDel(CK); render(); renderG(); showLogin("first");
 }
 
 /* ---------- Occurrences ---------- */
@@ -1142,7 +1179,9 @@ render(); renderG();
   if (!CFG.clientId || /^VOTRE|^YOUR/i.test(CFG.clientId)) { showLogin("config"); return; }
   if (!(await loadGsi())) { if (events.size) { $("gState").textContent = "Hors connexion"; return; } showLogin("offline"); return; }
   if (hasToken()) { await start(); }
-  else if (signedBefore()) { showLogin("back"); try { await requestToken("none"); await start(); } catch {} }
+  else if (AUTH && lsGet(RK)) { try { await refreshWithRt(); await start(); } catch { showLogin("back"); } }
+  else if (signedBefore() && !AUTH) { showLogin("back"); try { await requestToken("none"); await start(); } catch {} }
+  else if (signedBefore()) showLogin("back");
   else showLogin("first");
 })();
 // un premier geste après expiration (1 h) renouvelle la session sans pop-up supplémentaire
