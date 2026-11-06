@@ -1,0 +1,23 @@
+KALO (version hebergee) - mise en ligne
+
+1) GITHUB (gratuit)
+   - Cree un compte sur github.com si besoin.
+   - Nouveau depot (bouton +, New repository) : nom "kalo", Public. Cree-le.
+   - "uploading an existing file" : glisse TOUS les fichiers de ce dossier (index.html, config.js, manifest.webmanifest, sw.js, privacy.html, les .png). Commit.
+   - Settings > Pages > Branch : main, dossier / (root) > Save.
+   - Ton lien : https://TONPSEUDO.github.io/kalo/
+
+2) GOOGLE CLOUD (projet KALO)
+   - Google Auth Platform > Clients > Creer un client > Application Web.
+   - Origines JavaScript autorisees : https://TONPSEUDO.github.io   (sans /kalo, sans / final)
+   - Cree, puis copie l'ID client (finit par .apps.googleusercontent.com).
+
+3) CONFIG
+   - Sur GitHub, ouvre config.js, crayon (Edit), remplace VOTRE_CLIENT_ID... par ton ID client. Commit.
+
+4) AMIS
+   - Google Auth Platform > Audience > Utilisateurs test : ajoute l'adresse Gmail de chaque ami (100 max).
+   - Donne-leur le lien. Ils cliquent "Continuer avec Google", puis Parametres avances > Acceder a Kalo (non securise).
+   - Chez eux : iPhone Safari > Partager > Sur l'ecran d'accueil ; PC Brave/Chrome > Installer Kalo.
+
+5) Dans privacy.html, remplace [Ton adresse e-mail de contact].

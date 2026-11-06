@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f13">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kalo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="config.js"></script>
+<title>Kalo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: une colonne sur téléphone (saisie, prochain moment, timeline) ; sur PC, timeline à gauche et mois à droite. */
+:root{
+  --bg:#0d0f13; --surface:#151820; --surface-2:#1c2029; --line:#262b35;
+  --fg:#eceef3; --muted:#8b92a1; --faint:#5c6372;
+  --accent:#b3c0ff; --accent-ink:#0d0f13; --warn:#f1c46b; --danger:#f08a8a;
+  --c-anniv:#f58fbd; --c-sortie:#f5a65b; --c-voyage:#6ea8fe; --c-pro:#a58bf7;
+  --c-sante:#4fd1c5; --c-admin:#e6c75a; --c-perso:#a3d95b;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --f-mono:"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--fg);font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:20px 14px}
+.brand{font:700 26px/1 var(--f-display);letter-spacing:-.02em;margin:0}
+.brand span{color:var(--accent)}
+.today-label{color:var(--muted);font-size:13px;text-transform:capitalize}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:999px;color:var(--muted);font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+
+/* Saisie */
+.composer{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:6px 12px}
+.inputrow{display:flex;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:6px 6px 6px 14px;transition:border-color .15s}
+.inputrow:focus-within{border-color:var(--accent)}
+.inputrow input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:16px;padding:8px 0}
+.inputrow input::placeholder{color:var(--faint)}
+.addbtn{border:0;background:var(--accent);color:var(--accent-ink);font-weight:600;border-radius:10px;padding:0 16px;font-size:14px}
+.addbtn:disabled{opacity:.35;cursor:default}
+.preview{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:26px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.chip.title{color:var(--fg);font-weight:500}
+.chip.missing{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--c, var(--c-perso))}
+
+/* Grille principale */
+.grid{display:grid;gap:28px}
+.seg.view{display:none}
+.listcol[hidden],.monthcol[hidden]{display:block!important}
+.monthcol{order:-1}.day{aspect-ratio:1.15}.month{padding:12px}.daylist .quick{display:none}
+.month .legend{margin-top:8px;padding-top:8px}
+@media (min-width:900px){.grid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+  .monthcol{order:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 96px)}.day{aspect-ratio:1}.daylist .quick{display:block}}
+
+/* Prochain moment */
+.next{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:18px 18px 16px;border-radius:var(--r);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,var(--surface)),var(--surface) 70%);border:1px solid color-mix(in srgb,var(--c) 25%,var(--line));cursor:pointer;margin-bottom:22px}
+.next .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.next .t{font:600 19px/1.2 var(--f-display);margin-top:4px;text-wrap:balance}
+.next .d{color:var(--muted);font-size:13px;margin-top:4px}
+.next .big{font:700 46px/0.9 var(--f-display);color:var(--c);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.next .big small{display:block;font:500 12px/1.4 var(--f-body);color:var(--muted);margin-top:4px}
+
+/* Timeline */
+.group{margin-bottom:22px}
+.group h2{font:500 11.5px/1 var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;display:flex;gap:8px}
+.group h2 .n{color:var(--faint)}
+.ev{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:12px 4px}
+.ev:hover{background:var(--surface)}
+.ev .date{font-family:var(--f-mono);text-align:center;line-height:1.1}
+.ev .date b{display:block;font-size:19px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--c)}
+.ev .date i{font-style:normal;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ev .body{min-width:0}
+.ev .name{font-weight:500;overflow-wrap:anywhere}
+.ev .meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:3px}
+.ev .meta .warn{color:var(--warn)}
+.ev .cd{font:500 12.5px/1 var(--f-mono);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ev .cd.now{color:var(--c)}
+.pastbtn{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:10px;padding:9px 14px;font-size:13px;width:100%}
+
+/* Empty */
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:16px 18px;color:var(--muted);font-size:14px}
+.empty h3{font:600 16px/1.2 var(--f-display);color:var(--fg);margin:0}
+.empty .ex{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.empty .ex button{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--fg)}
+
+/* Mois */
+.month{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mhead h2{font:600 17px/1 var(--f-display);margin:0;text-transform:capitalize}
+.mhead button{background:none;border:1px solid var(--line);border-radius:8px;width:32px;height:32px;color:var(--muted)}
+.mhead .tb{width:auto;padding:0 10px;font-size:12px;margin-right:6px}
+.wk,.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.wk span{text-align:center;font-size:10.5px;color:var(--faint);text-transform:uppercase;padding-bottom:6px}
+.day{aspect-ratio:1;max-width:100%;border:0;background:none;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 13px/1 var(--f-mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.day.out{color:var(--faint)}
+.day.today{color:var(--accent);font-weight:700}
+.day:hover{background:var(--surface-2)}
+.day.has{background:color-mix(in srgb,var(--c) 20%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 40%,transparent)}
+.day.has:hover{background:color-mix(in srgb,var(--c) 30%,transparent)}
+.day[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--accent);color:var(--fg)}
+.day.today[aria-pressed="true"]{color:var(--accent)}
+.day .dots{display:flex;gap:3px;height:6px}
+.day .dots i{width:6px;height:6px;border-radius:50%;background:var(--c)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.legend button{display:inline-flex;gap:6px;align-items:center;background:none;border:0;padding:4px 7px;border-radius:999px;font-size:12px;color:var(--muted)}
+.legend button:hover{background:var(--surface-2);color:var(--fg)}
+.legend button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--c)}
+.daylist{margin-top:14px}
+.daylist h3{font:500 12px/1 var(--f-body);color:var(--muted);text-transform:capitalize;margin:0 0 4px;letter-spacing:.03em}
+.daylist .none{color:var(--faint);font-size:13px;padding:10px 0}
+.daylist .quick{background:none;border:0;color:var(--accent);font-size:13px;padding:8px 0}
+
+/* Feuille d'édition */
+.backdrop{position:fixed;inset:0;background:rgba(5,6,9,.6);z-index:23;backdrop-filter:blur(2px)}
+.sheet{position:fixed;z-index:24;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:var(--surface);border-top:1px solid var(--line);border-radius:20px 20px 0 0;
+  padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+@media (min-width:700px){.sheet{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100vw - 32px));border-radius:20px;border:1px solid var(--line)}}
+.sheet h2{font:600 20px/1.2 var(--f-display);margin:0 0 14px}
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label,.field .l{font-size:12px;color:var(--muted);letter-spacing:.03em}
+.field input,.field textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;width:100%;min-width:0}
+.field textarea{min-height:64px;resize:vertical}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.cats button{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:13px;color:var(--muted)}
+.cats button[aria-pressed="true"]{border-color:var(--c);color:var(--fg);background:color-mix(in srgb,var(--c) 14%,var(--bg))}
+.check{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:14px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.titlerow{display:flex;gap:8px}
+.titlerow input{flex:1}
+.ghost{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:13px;color:var(--fg);white-space:nowrap}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:11px 16px;font-weight:500;font-size:14px;text-decoration:none;color:var(--fg);display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:var(--accent-ink);border-color:var(--danger)}
+.spacer{flex:1}
+.gnote{font-size:12px;color:var(--muted);margin:10px 0 0}
+.gnote.warn{color:var(--warn)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px;font-size:14px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:calc(100vw - 32px)}
+.toast button{background:none;border:0;color:var(--bg);font-weight:600;text-decoration:underline;padding:0}
+.tools{display:flex;gap:8px;align-items:center;margin-bottom:18px}
+.search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.search:focus-within{border-color:var(--accent)}
+.search svg{flex:none;color:var(--faint)}
+.search input{flex:1;min-width:0;background:none;border:0;outline:0;padding:9px 0;font-size:15px}
+.seg.filt button[data-f="pro"][aria-pressed="true"]{background:color-mix(in srgb,var(--c-pro) 22%,var(--surface-2));color:var(--fg)}
+.todaybar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:11px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:14px;font-size:14px}
+.todaybar .k{font:500 11px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-right:2px}
+.todaybar button{background:none;border:0;padding:0;display:inline-flex;align-items:center;gap:6px;color:var(--fg);text-align:left}
+.todaybar button:hover{text-decoration:underline}
+.todaybar .t{font-family:var(--f-mono);color:var(--muted);font-size:12.5px}
+.todaybar .q{color:var(--muted)}
+.propanel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:22px}
+.propanel div{background:var(--surface);padding:12px 14px;min-width:0}
+.propanel b{display:block;font:700 24px/1 var(--f-display);color:var(--c-pro);font-variant-numeric:tabular-nums}
+.propanel span{display:block;font-size:12px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+@media (max-width:420px){.propanel{grid-template-columns:minmax(0,1fr)}.propanel div{display:flex;gap:10px;align-items:baseline}.propanel span{margin:0}}
+.st{font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+.st.livre{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.st.paye{color:var(--c-sante);border-color:color-mix(in srgb,var(--c-sante) 40%,transparent)}
+.field select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;width:100%;min-width:0}
+.prof[hidden]{display:none!important}
+.fab{position:fixed;z-index:15;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface-2);color:var(--accent);border-radius:50%;box-shadow:0 6px 20px rgba(0,0,0,.4);transition:transform .15s}
+.fab:hover{transform:scale(1.06)}
+.chat{position:fixed;z-index:22;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));height:min(62vh,460px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.5);overflow:hidden}
+@media (min-width:700px){.chat{left:auto;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(70px + env(safe-area-inset-bottom,0px));width:340px;height:min(70vh,440px)}}
+.chathead{display:flex;align-items:center;gap:4px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line)}
+.chathead h2{font:600 14px/1 var(--f-display);margin:0;flex:1;color:var(--muted)}
+.chathead button{background:none;border:0;border-radius:8px;color:var(--muted);width:30px;height:30px;display:grid;place-items:center}
+.chathead button:hover{background:var(--surface-2);color:var(--fg)}
+.msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:12px}
+.msg{max-width:90%;padding:7px 11px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13.5px}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:4px}
+.msg.ai.wait{color:var(--muted)}
+.msg.err{color:var(--danger)}
+.hello{color:var(--muted);font-size:13px}
+.hello .ex{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:8px}
+.hello .ex button{background:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px;color:var(--fg);text-align:left}
+.hello .ex button:hover{border-color:var(--accent)}
+.plan{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:8px 10px;white-space:normal}
+.plan ul{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:12.5px}
+.plan li{display:flex;gap:8px;align-items:baseline}
+.plan li b{font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase;min-width:58px;color:var(--muted)}
+.plan li b.del{color:var(--danger)}
+.plan li b.add{color:var(--c-sante)}
+.plan li b.upd{color:var(--warn)}
+.plan .pa{display:flex;gap:6px;margin-top:8px}
+.plan .pa button{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:500}
+.plan .pa .ok{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.plan .pa .ok.danger{background:var(--danger);border-color:var(--danger)}
+.plan .done{font-size:12px;color:var(--muted);margin-top:6px}
+.chatin{display:flex;align-items:flex-end;gap:6px;padding:8px;border-top:1px solid var(--line)}
+.chatin textarea{flex:1;min-width:0;resize:none;overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:16px;max-height:96px;line-height:1.3;height:36px}
+@media (min-width:700px){.chatin textarea{font-size:14px}}
+.chatin textarea:focus{outline:0;border-color:var(--accent)}
+.chatin button{flex:none;border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;width:36px;height:36px;display:grid;place-items:center}
+.chatin button.stop{background:var(--surface-2);color:var(--fg);border:1px solid var(--line)}
+.gbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;margin-top:26px;font-size:12.5px;color:var(--muted)}
+.gbar label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.gbar input{accent-color:var(--accent)}
+.gbar button{background:none;border:1px solid var(--line);border-radius:999px;color:var(--fg);padding:4px 11px;font-size:12.5px}
+.gbar button:hover{border-color:var(--accent)}
+.status{font-size:12px;color:var(--faint);margin-top:10px;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+[hidden]{display:none!important}
+.login{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:24px}
+.logincard{max-width:380px;text-align:left}
+.logincard .brand{font-size:44px;margin:0 0 14px}
+.logincard p{color:var(--muted);line-height:1.5;margin:0 0 22px}
+.logincard .btn{width:100%;justify-content:center;padding:13px 16px;font-size:15px}
+.logincard .small{font-size:12px;color:var(--faint);margin:16px 0 0}
+.logincard .small a{color:var(--muted)}
+.login[hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 class="brand">Kalo<span>.</span></h1>
+      <div class="today-label" id="todayLabel"></div>
+    </div>
+    <div class="seg view" role="group" aria-label="Vue">
+      <button id="vList" aria-pressed="true">À venir</button>
+      <button id="vMonth" aria-pressed="false">Mois</button>
+    </div>
+  </header>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <div class="inputrow">
+      <input id="q" type="text" placeholder="Ajouter un événement…" aria-label="Nouvel événement" enterkeyhint="done">
+      <button class="addbtn" id="addBtn" type="submit" disabled>Ajouter</button>
+    </div>
+    <div class="preview" id="preview" aria-live="polite"></div>
+  </form>
+
+  <div class="tools">
+    <label class="search" for="s"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="s" type="search" placeholder="Rechercher un événement, un client…" aria-label="Rechercher"></label>
+    <div class="seg filt" role="group" aria-label="Filtre">
+      <button data-f="all" aria-pressed="true">Tout</button>
+      <button data-f="pro" aria-pressed="false">Pro</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="listcol" id="listCol">
+      <div id="todayBar"></div>
+      <div id="proPanel"></div>
+      <div id="nextCard"></div>
+      <div id="timeline"></div>
+    </section>
+    <section class="monthcol" id="monthCol" hidden>
+      <div class="month">
+        <div class="mhead">
+          <h2 id="mTitle"></h2>
+          <div><button class="tb" id="mToday">Aujourd'hui</button><button id="mPrev" aria-label="Mois précédent">‹</button> <button id="mNext" aria-label="Mois suivant">›</button></div>
+        </div>
+        <div class="wk"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+        <div class="days" id="days"></div>
+        <div class="legend" id="legend"></div>
+        <div class="daylist" id="dayList"></div>
+      </div>
+    </section>
+  </div>
+  <div class="gbar" id="gBar"><span id="gState" aria-live="polite">Chargement…</span><button type="button" id="signOut" hidden>Se déconnecter</button></div>
+</div>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle" hidden>
+  <h2 id="sTitle">Modifier</h2>
+  <div class="field">
+    <label for="fTitle">Titre</label>
+    <input id="fTitle" type="text">
+  </div>
+  <div class="field"><span class="l">Catégorie</span><div class="cats" id="fCats"></div></div>
+  <div class="row2">
+    <div class="field"><label for="fDate">Date</label><input id="fDate" type="date"></div>
+    <div class="field"><label for="fTime">Heure (facultatif)</label><input id="fTime" type="time"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label for="fEnd">Jusqu'au (facultatif)</label><input id="fEnd" type="date"></div>
+    <div class="field"><label for="fBirth">Année de naissance</label><input id="fBirth" type="number" inputmode="numeric" placeholder="ex. 1998" min="1900" max="2100"></div>
+  </div>
+  <div class="row2 prof" id="proFields">
+    <div class="field"><label for="fClient">Client</label><input id="fClient" type="text" placeholder="ex. 75PROD"></div>
+    <div class="field"><label for="fStatus">Statut</label><select id="fStatus"><option value="encours">En cours</option><option value="livre">Livré, pas encore payé</option><option value="paye">Payé</option></select></div>
+  </div>
+  <div class="field"><label for="fRepeat">Répéter</label><select id="fRepeat"><option value="">Jamais</option><option value="week">Chaque semaine</option><option value="month">Chaque mois</option><option value="year">Chaque année</option></select></div>
+  <div class="field"><label for="fNote">Note</label><textarea id="fNote" placeholder="Idée cadeau, adresse, numéro de réservation…"></textarea></div>
+  <div class="actions">
+    <button class="btn primary" id="saveBtn" type="button">Enregistrer</button>
+    <span class="spacer"></span>
+    <button class="btn danger" id="delBtn" type="button">Supprimer</button>
+  </div>
+  <p class="gnote" id="gNote"></p>
+</div>
+<div class="login" id="login" hidden>
+  <div class="logincard">
+    <h1 class="brand">Kalo<span>.</span></h1>
+    <p id="loginTxt">Ton agenda perso, simple et rapide. Tes événements vivent dans ton Google Agenda : alertes sur ton téléphone, sur ton PC, partout.</p>
+    <button class="btn primary" id="loginBtn" type="button">Continuer avec Google</button>
+    <p class="small" id="loginSmall">Kalo ne garde rien sur un serveur. <a href="privacy.html">Confidentialité</a></p>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const CATS = {
+  anniv:{label:"Anniversaire",c:"var(--c-anniv)"}, sortie:{label:"Sortie",c:"var(--c-sortie)"},
+  voyage:{label:"Voyage",c:"var(--c-voyage)"}, pro:{label:"Pro",c:"var(--c-pro)"},
+  sante:{label:"Santé",c:"var(--c-sante)"}, admin:{label:"Admin",c:"var(--c-admin)"}, perso:{label:"Perso",c:"var(--c-perso)"}
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const deacc = s => [...s].map(ch => ch.normalize("NFD")[0]).join("");
+const pad = n => String(n).padStart(2,"0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pISO = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const addDays = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const diff = (a,b) => Math.round((a-b)/864e5);
+const fmt = (d,o) => new Intl.DateTimeFormat("fr-FR",o).format(d);
+const uid = () => { const a = "0123456789abcdefghijklmnopqrstuv"; let s = ""; for (const x of crypto.getRandomValues(new Uint8Array(22))) s += a[x % 32]; return s; };
+
+/* ---------- Analyse de la saisie ---------- */
+const MONTHS = {janvier:1,janv:1,jan:1,fevrier:2,fevr:2,fev:2,mars:3,mar:3,avril:4,avr:4,mai:5,juin:6,juillet:7,juil:7,aout:8,septembre:9,sept:9,sep:9,octobre:10,oct:10,novembre:11,nov:11,decembre:12,dec:12};
+const MRE = "(janvier|janv|jan|fevrier|fevr|fev|mars|mar|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|sep|octobre|oct|novembre|nov|decembre|dec)\\.?(?![a-z])";
+const WD = {lundi:1,mardi:2,mercredi:3,jeudi:4,vendredi:5,samedi:6,dimanche:0,lun:1,ven:5};
+const WD2 = {lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6,dim:0};
+const ANNIV = new Set(["anniv","anniversaire","annif","anni","aniv","anif","annive","anniversair","bday","birthday","anv"]);
+const PROS = {dentiste:"dentiste",medecin:"médecin",doc:"médecin",docteur:"médecin",generaliste:"généraliste",kine:"kiné",osteo:"ostéo",ophtalmo:"ophtalmo",dermato:"dermato",gyneco:"gynéco",coiffeur:"coiffeur",notaire:"notaire",banquier:"banquier",veto:"véto",psy:"psy"};
+const DICT = {resto:"restaurant",restau:"restaurant",cine:"cinéma",cinema:"cinéma",aprem:"après-midi",apero:"apéro",soiree:"soirée",dej:"déjeuner",diner:"dîner",we:"week-end","w-e":"week-end",weekend:"week-end",exam:"examen",reu:"réunion",reunion:"réunion",impots:"impôts",prefecture:"préfecture",fete:"fête",teuf:"fête",aeroport:"aéroport",tgv:"TGV",rdv:"rendez-vous","rendez-vous":"rendez-vous",disney:"Disneyland Paris",disneyland:"Disneyland Paris",medecin:"médecin",kine:"kiné",osteo:"ostéo",velo:"vélo",theatre:"théâtre",musee:"musée",entrainement:"entraînement",seance:"séance",vaccin:"vaccin",livraison:"livraison",ecole:"école"};
+const PRO_KW = new Set(["rendu","rendus","livraison","livrer","deadline","call","brief","briefing","reunion","reu","facture","facturer","devis","retours","retour","review","feedback","presentation","kickoff","kick-off","shooting","projet","mission","relance","paiement","visio","validation","compo","compositing","render","onboarding","point"]);
+const NOT_CLIENT = new Set(["client","clients","final","finale","finaux","v1","v2","v3","3d","rendu","rendus","de","des","du","avec","le","la"]);
+const STOP = new Set(["le","la","les","du","au","aux","a","de","des","pour","ce","cette","prochain","prochaine","et","-","–","en","l'","d'",",","vers","le."]);
+const CAT_RULES = [
+  ["sante",/\b(dentiste|medecin|docteur|doc|kine|ophtalmo|dermato|gyneco|osteo|vaccin|prise de sang|hopital|pharmacie|radio|psy|generaliste|analyses?)\b/],
+  ["pro",/\b(client|clients|reunion|reu|call|visio|rendu|rendus|deadline|livraison|livrer|devis|facture|facturer|brief|briefing|meeting|presentation|entretien|boulot|taf|travail|cowork|coworking|shooting|freelance|projet|mission|compo|compositing|render|rendering|retours|review|feedback|kickoff|kick-off|validation|relance|paiement|nuke|blender|houdini|maya|cinema 4d|c4d|unreal|substance|animatique|lookdev|modelisation|anim|vfx|motion|portfolio|salon|onboarding|urssaf)\b/],
+  ["admin",/\b(impots|urssaf|declaration|banque|loyer|caf|prefecture|passeport|papiers|assurance|mutuelle|edf|abonnement|resiliation|paiement|carte grise|controle technique|mairie)\b/],
+  ["voyage",/\b(vol|avion|aeroport|train|tgv|vacances|voyage|sejour|hotel|airbnb|week-end|weekend|we|valise|road ?trip|ferry)\b/],
+  ["sortie",/\b(disney|disneyland|parc asterix|resto|restau|restaurant|cine|cinema|concert|festival|soiree|apero|bar|match|parc|expo|musee|theatre|bowling|karaoke|diner|dej|dejeuner|brunch|potes|fete|teuf|escape|laser ?game|spectacle|boite)\b/]
+];
+
+function mkDate(y,m,d){ const x = new Date(y,m-1,d); return (x.getMonth()===m-1) ? x : null; }
+function future(m,d){ const t = today(); let x = mkDate(t.getFullYear(),m,d); if (x && x < t) x = mkDate(t.getFullYear()+1,m,d); return x; }
+
+/* Tolérance aux fautes de frappe (javier → janvier, mrdi → mardi, demian → demain) */
+function osa(a,b){
+  const d = Array.from({length:a.length+1}, (_,i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    const c = a[i-1] === b[j-1] ? 0 : 1;
+    d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+c);
+    if (i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) d[i][j] = Math.min(d[i][j], d[i-2][j-2]+1);
+  }
+  return d[a.length][b.length];
+}
+function closest(w, list, max){ let best = null, bd = 99; for (const c of list) { const x = osa(w,c); if (x < bd) { bd = x; best = c; } } return bd <= max ? best : null; }
+const MONTH_FULL = ["janvier","fevrier","mars","avril","mai","juin","juillet","aout","septembre","octobre","novembre","decembre"];
+const WORD_FIX = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche","demain","aujourd'hui","anniversaire","prochain"];
+const FUZZ_SKIP = new Set(["ans","an","jours","jour","mois","semaine","semaines","personnes","pers","min","minutes","heures","heure","potes","fois","euros","places","rue","avenue","bis"]);
+function fixTypos(raw){
+  const L = "A-Za-zÀ-ÿ'";
+  // le mot juste après un nombre est très probablement un mois
+  raw = raw.replace(new RegExp(`(\\d{1,2}(?:er)?\\s*)([${L}]{3,11})(?![${L}])`,"g"), (m, pre, w) => {
+    const k = deacc(w.toLowerCase());
+    if (MONTHS[k] || FUZZ_SKIP.has(k) || /^h/.test(k) || /^er/.test(k)) return m;
+    const c = closest(k, Object.keys(MONTHS), k.length <= 4 ? 1 : 2);
+    return c ? pre + c : m;
+  });
+  // jours de la semaine, demain, aujourd'hui, anniversaire
+  raw = raw.replace(new RegExp(`[${L}]{4,}`,"g"), w => {
+    const k = deacc(w.toLowerCase());
+    if (WORD_FIX.includes(k) || DICT[k] || PROS[k] || MONTHS[k] || FUZZ_SKIP.has(k) || ["midi","demi","mari","dans"].includes(k)) return w;
+    const c = closest(k, k.length === 4 ? WORD_FIX.slice(0,7) : WORD_FIX, k.length >= 8 ? 2 : 1);
+    return c ? c : w;
+  });
+  return raw;
+}
+
+function parse(raw){
+  raw = fixTypos(raw);
+  const t = today(), thisY = t.getFullYear();
+  const norm = deacc(raw.toLowerCase());
+  const cut = []; // [start,end)
+  const free = (a,b) => !cut.some(([s,e]) => a < e && b > s);
+  const words = norm.split(/[^a-z0-9'-]+/);
+  const isAnniv = words.some(w => ANNIV.has(w));
+  let relDate = null, start = null, end = null, time = null, vague = null, birthYear = null, repeat = isAnniv ? "year" : null;
+  const take = (re, fn) => { re.lastIndex = 0; let m; while ((m = re.exec(norm))) { if (!free(m.index, m.index+m[0].length)) continue; if (fn(m)) { cut.push([m.index, m.index+m[0].length]); return true; } } return false; };
+  const year = (y) => { if (!y) return null; y = +y; if (y < 100) y += 2000; return y; };
+  const withYear = (y,m,d) => {
+    if (y && isAnniv && y < thisY) { birthYear = y; y = null; }
+    return y ? mkDate(y,m,d) : future(m,d);
+  };
+
+  // chaque mois / toutes les semaines / chaque année
+  take(/\b(?:chaque|tous les|toutes les)\s+(mois|ans?|annees?|semaines?)\b/g, m => { repeat = m[1] === "mois" ? "month" : m[1].startsWith("s") ? "week" : "year"; return true; });
+  take(/\b(mensuel(?:le)?|hebdo(?:madaire)?|annuel(?:le)?)\b/g, m => { repeat = m[1].startsWith("m") ? "month" : m[1].startsWith("h") ? "week" : "year"; return true; });
+  // dans 2min / dans 1h / dans 1h30 / dans une heure / dans une demi-heure
+  take(/\bdans\s+(?:(\d+)\s*(?:h|heures?)(?:\s*(\d{1,2})(?!\d))?|(\d+)\s*(?:min|mn|minutes?)|(?:une?\s+)?demi[- ]?heure|(?:1\/2)\s*h|une?\s+heure)(?![a-z\d])/g, m => {
+    let mins; if (m[1]) mins = +m[1]*60 + (+m[2]||0); else if (m[3]) mins = +m[3]; else if (/demi|1\/2/.test(m[0])) mins = 30; else mins = 60;
+    if (mins < 1 || mins > 1440) return false;
+    const d = new Date(Date.now() + mins*60000); relDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()); time = `${pad(d.getHours())}:${pad(d.getMinutes())}`; start = relDate; return true; });
+  // plage : du 20 au 22 décembre / 20 déc au 22 / 20-22 déc
+  take(new RegExp("(?:\\bdu\\s+)?(?<![\\d/])(\\d{1,2})(?:er)?(?:\\s+"+MRE+")?(?:\\s+(\\d{4}))?\\s*(?:au|-|jusqu'?au)\\s*(\\d{1,2})(?:er)?(?![\\dh:])(?:\\s+"+MRE+")?(?:\\s+(\\d{4}))?","g"), m => {
+    const m1 = MONTHS[m[2]||m[5]], m2 = MONTHS[m[5]||m[2]]; if (!m1) return false;
+    const y = year(m[3]||m[6]);
+    const s = y ? mkDate(y,m1,+m[1]) : future(m1,+m[1]); if (!s) return false;
+    let e = mkDate(s.getFullYear(),m2,+m[4]); if (e && e < s) e = mkDate(s.getFullYear()+1,m2,+m[4]);
+    if (!e) return false; start = s; end = e; return true;
+  });
+  // 12/03 ou 12/03/2027
+  if (!start) take(/(?<!\d)(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/g, m => { const d = withYear(year(m[3]),+m[2],+m[1]); if (!d) return false; start = d; return true; });
+  // 12 mars (1998)
+  if (!start) take(new RegExp("(?:\\ble\\s+)?(?<!\\d)(\\d{1,2})(?:er)?\\s+"+MRE+"(?:\\s+(\\d{4}))?","g"), m => { const d = withYear(year(m[3]),MONTHS[m[2]],+m[1]); if (!d) return false; start = d; return true; });
+  // aujourd'hui, demain, ce soir
+  if (relDate) take(/\b(?:aujourd'?hui|aujourdhui|ajrd'?hui|ajd'?hui|ajrd|ajd|aujd|auj)\b/g, () => true);
+  if (!start) take(/\b(apres[- ]demain|ap(?:r|res)?\.?[ -]?dem(?:ain)?|apdm|aujourd'?hui|aujourdhui|ajrd'?hui|ajd'?hui|ajrd|ajd|aujd|auj|demain|dem|dm|ce soir|ce matin|cet apres-midi|cet aprem)\b/g, m => {
+    const w = m[1]; start = w.startsWith("ap") ? addDays(t,2) : (w === "demain" || w === "dem" || w === "dm") ? addDays(t,1) : t;
+    if (w === "ce soir") vague = "20:00"; if (w === "ce matin") vague = "09:00"; if (w.startsWith("cet")) vague = "14:00"; return true; });
+  // dans 3 jours / 2 semaines / 1 mois
+  if (!start) take(/\bdans\s+(\d+)\s*(jours?|j|semaines?|sem|mois)\b/g, m => { const n = +m[1]; if (m[2] === "mois") { const d = new Date(t); d.setMonth(d.getMonth()+n); start = d; } else start = addDays(t, m[2].startsWith("s") ? n*7 : n); return true; });
+  // ce week-end
+  if (!start) take(/\bce\s+(?:week-?end|we)\b/g, () => { let d = addDays(t,1); while (d.getDay() !== 6) d = addDays(d,1); if (t.getDay() === 6) d = t; if (t.getDay() === 0) { start = t; return true; } start = d; end = addDays(d,1); return true; });
+  // la semaine prochaine / sem pro
+  if (!start) take(/\b(?:la\s+|en\s+)?(?:semaine|sem)\s+(?:prochaine|pro)\b/g, () => { let d = addDays(t,1); while (d.getDay() !== 1) d = addDays(d,1); start = d; return true; });
+  // abréviations ambiguës : "le sam", "ce dim", "mar."
+  if (!start) take(/\b(?:(?:ce|le)\s+(mar|mer|jeu|sam|dim)\b|(mar|mer|jeu|sam|dim)\.)/g, m => { const k = m[1] || m[2]; let d = addDays(t,1); while (d.getDay() !== WD2[k]) d = addDays(d,1); start = d; return true; });
+  // mardi (prochain)
+  if (!start) take(/\b(?:ce\s+|le\s+)?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|ven)(?:\s+prochain)?\b/g, m => { let d = addDays(t,1); while (d.getDay() !== WD[m[1]]) d = addDays(d,1); start = d; return true; });
+  // le 12
+  if (!start) take(/\ble\s+(\d{1,2})(?:er)?(?![\d\/h:a-z])/g, m => { const n = +m[1]; if (n < 1 || n > 31) return false; let d = null; for (let k = 1; k <= 4 && !d; k++) { const x = mkDate(t.getFullYear(),t.getMonth()+k,n); if (x && x >= t) d = x; } if (!d) return false; start = d; return true; });
+  // heure
+  if (!time) take(/(?:\b(?:a|vers)\s+)?(?<![\d\/])(\d{1,2})\s*(?:h|:)\s*(\d{2})?(?![a-z\d])/g, m => { const h = +m[1], mi = +(m[2]||0); if (h > 23 || mi > 59) return false; time = `${pad(h)}:${pad(mi)}`; return true; });
+  if (!time) take(/\b(?:a\s+)?(midi|minuit)\b/g, m => { time = m[1] === "midi" ? "12:00" : "00:00"; return true; });
+  take(/\b(?:le\s+|ce\s+|en\s+|dans la\s+)?(matinee|matin|apres-midi|apres midi|aprem|soir)\b/g, m => { if (!vague) vague = m[1] === "soir" ? "20:00" : m[1].startsWith("mat") ? "09:00" : "14:00"; return true; });
+  if (!time && vague) time = vague;
+  if (!start && time) { const [hh,mm] = time.split(':').map(Number); const nw = new Date(); start = (hh*60+mm > nw.getHours()*60+nw.getMinutes()) ? t : addDays(t,1); }
+
+  // reste → titre
+  let rest = ""; for (let i = 0; i < raw.length; i++) rest += cut.some(([s,e]) => i >= s && i < e) ? " " : raw[i];
+  const { title, client } = cleanTitle(rest, isAnniv);
+  let cat = "perso";
+  if (isAnniv) cat = "anniv"; else for (const [k,re] of CAT_RULES) if (re.test(norm)) { cat = k; break; }
+  if (client) cat = "pro";
+  if (repeat && !start) start = t;
+  const ev = { title, cat, date: start ? iso(start) : null, end: end ? iso(end) : null, time, repeat, yearly: repeat === "year", birthYear };
+  if (cat === "pro") { ev.client = client || ""; ev.status = "encours"; }
+  return ev;
+}
+
+const cap = w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+const vowel = w => /^[aeiouyhéèêàâîôû]/i.test(w);
+function cleanTitle(rest, isAnniv){
+  let w = rest.replace(/[,;]+/g," ").split(/\s+/).filter(Boolean);
+  const n = x => deacc(x.toLowerCase());
+  const trim = () => { while (w.length && STOP.has(n(w[0]))) w.shift(); while (w.length && STOP.has(n(w[w.length-1]))) w.pop(); };
+  trim();
+  if (isAnniv) {
+    w = w.filter(x => !ANNIV.has(n(x)));
+    while (w.length && ["de","du","d'"].includes(n(w[0]))) w.shift();
+    if (w[0] && /^d'/i.test(w[0])) w[0] = w[0].slice(2);
+    trim();
+    const names = w.map(x => ["et","&"].includes(n(x)) ? "et" : cap(x)).join(" ");
+    return { title: names ? `Anniversaire ${vowel(names) ? "d'" : "de "}${names}` : "Anniversaire", client: "" };
+  }
+  const out = []; let client = "";
+  for (let i = 0; i < w.length; i++) {
+    const k = n(w[i]);
+    if ((k === "disney" || k === "disneyland")) { out.push("Disneyland Paris"); if (w[i+1] && n(w[i+1]) === "paris") i++; continue; }
+    if ((k === "rdv" || k === "rendez-vous") && w[i+1] && PROS[n(w[i+1])]) { const p = PROS[n(w[i+1])]; out.push("rendez-vous", "chez", vowel(p) ? "l'"+p : "le "+p); i++; continue; }
+    if (k === "chez" && w[i+1] && PROS[n(w[i+1])]) { const p = PROS[n(w[i+1])]; out.push("chez", vowel(p) ? "l'"+p : "le "+p); i++; continue; }
+    if (k === "avec") { out.push("avec"); while (w[i+1] && !STOP.has(n(w[i+1])) || (w[i+1] && n(w[i+1]) === "et" && w[i+2])) { i++; out.push(n(w[i]) === "et" ? "et" : cap(w[i])); } continue; }
+    out.push(DICT[k] ?? w[i]);
+    // après un mot du métier (rendu, livraison, call…), le mot suivant est souvent le client
+    if (PRO_KW.has(k) && !client) {
+      let j = i + 1;
+      if (w[j] && ["pour","chez","de","du"].includes(n(w[j]))) { out.push(w[j]); j++; }
+      const nx = w[j];
+      if (nx && !STOP.has(n(nx)) && !NOT_CLIENT.has(n(nx)) && !DICT[n(nx)]) { client = /^[A-Z0-9]{2,}$/.test(nx) ? nx : cap(nx); out.push(client); i = j; }
+      else i = j - 1;
+    }
+  }
+  const s = out.join(" ").replace(/\s+/g," ").trim();
+  return { title: cap(s), client };
+}
+
+/* ---------- Données : Google Agenda ---------- */
+let events = new Map();
+const CFG = window.KALO_CONFIG || {};
+const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const API = "https://www.googleapis.com/calendar/v3";
+const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris"; } catch { return "Europe/Paris"; } })();
+const known = new Set();
+let token = null, tokenExp = 0, tokenClient = null, account = "", gq = Promise.resolve(), pending = 0, authWait = null, tcb = {}, online = false;
+const SK = "kalo-session", CK = "kalo-cache";
+const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
+try { const s = JSON.parse(lsGet(SK) || "null"); if (s && s.exp > Date.now() + 60000) { token = s.t; tokenExp = s.exp; } } catch {}
+const hasToken = () => !!(token && Date.now() < tokenExp);
+const signedBefore = () => lsGet("kalo-signed") === "1";
+
+function loadGsi(){
+  return new Promise(res => {
+    if (window.google?.accounts?.oauth2) return res(true);
+    const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    s.onload = () => res(true); s.onerror = () => res(false); document.head.append(s);
+  });
+}
+function requestToken(prompt){
+  return new Promise((resolve, reject) => {
+    if (!tokenClient) tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CFG.clientId, scope: SCOPE,
+      callback: r => tcb.ok && tcb.ok(r), error_callback: e => tcb.err && tcb.err(e) });
+    tcb = {
+      ok: r => { if (r.error) return reject(new Error(r.error)); token = r.access_token; tokenExp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000;
+        lsSet(SK, JSON.stringify({ t: token, exp: tokenExp })); lsSet("kalo-signed", "1"); resolve(token); },
+      err: e => reject(new Error((e && e.type) || "popup"))
+    };
+    tokenClient.requestAccessToken({ prompt });
+  });
+}
+function ensureToken(){
+  if (hasToken()) return Promise.resolve(token);
+  if (!window.google?.accounts?.oauth2) return Promise.reject(new Error("auth"));
+  if (!authWait) authWait = requestToken("").finally(() => { authWait = null; });
+  return authWait;
+}
+async function api(path, opt = {}, retry = true){
+  const t = await ensureToken();
+  const r = await fetch(API + path, { ...opt, headers: { Authorization: "Bearer " + t, "Content-Type": "application/json", ...(opt.headers || {}) } });
+  if (r.status === 401 && retry) { token = null; tokenExp = 0; lsDel(SK); return api(path, opt, false); }
+  if (!r.ok) { const e = new Error("api " + r.status); e.status = r.status; try { e.body = await r.json(); } catch {} throw e; }
+  return r.status === 204 ? null : r.json();
+}
+
+const FREQ = { year: "YEARLY", month: "MONTHLY", week: "WEEKLY" };
+const gAllDay = ev => !ev.time || !!ev.end;
+function reminders(ev){
+  let m;
+  if (gAllDay(ev)) m = ev.cat === "anniv" ? [9540, 900] : [900];
+  else m = [1440, ev.cat === "sante" ? 120 : ev.cat === "voyage" ? 180 : 60, 0];
+  return m.map(minutes => ({ method: "popup", minutes }));
+}
+const RT = { 0: "à l'heure", 900: "la veille à 9h", 9540: "7 jours avant à 9h", 60: "1 h avant", 120: "2 h avant", 180: "3 h avant", 1440: "24 h avant" };
+const remText = ev => reminders(ev).map(r => RT[r.minutes]).join(" + ");
+function toG(ev){
+  const b = { summary: ev.title, status: "confirmed", description: ev.note || "",
+    reminders: { useDefault: false, overrides: reminders(ev) },
+    extendedProperties: { private: { kalo: "1", cat: ev.cat || "perso", client: ev.client || "", status: ev.status || "", birth: ev.birthYear ? String(ev.birthYear) : "", raw: (ev.raw || "").slice(0, 200) } } };
+  if (gAllDay(ev)) { b.start = { date: ev.date }; b.end = { date: iso(addDays(pISO(ev.end || ev.date), 1)) }; }
+  else {
+    const s = new Date(`${ev.date}T${ev.time}:00`), e = new Date(+s + 36e5);
+    const L = d => `${iso(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    b.start = { dateTime: L(s), timeZone: TZ }; b.end = { dateTime: L(e), timeZone: TZ };
+  }
+  const r = rep(ev); if (r) b.recurrence = ["RRULE:FREQ=" + FREQ[r]];
+  return b;
+}
+function fromG(g){
+  const p = g.extendedProperties?.private || {};
+  const sd = g.start?.date || (g.start?.dateTime || "").slice(0, 10); if (!sd) return null;
+  const ev = { id: g.id, title: g.summary || "Sans titre", cat: CATS[p.cat] ? p.cat : "perso", date: sd, note: g.description || "", createdAt: g.created, updatedAt: g.updated };
+  if (g.start.dateTime) ev.time = g.start.dateTime.slice(11, 16);
+  if (g.start.date && g.end?.date) { const e = iso(addDays(pISO(g.end.date), -1)); if (e > sd) ev.end = e; }
+  const rr = (g.recurrence || []).find(x => x.startsWith("RRULE"));
+  if (rr) { const m = rr.match(/FREQ=(YEARLY|MONTHLY|WEEKLY)/); if (m) ev.repeat = { YEARLY: "year", MONTHLY: "month", WEEKLY: "week" }[m[1]]; }
+  ev.yearly = ev.repeat === "year";
+  if (p.client) ev.client = p.client; if (p.status) ev.status = p.status; if (p.birth) ev.birthYear = +p.birth; if (p.raw) ev.raw = p.raw;
+  return ev;
+}
+function gErr(e){
+  if (e && e.status === 403 && /accessNotConfigured|has not been used/i.test(JSON.stringify(e.body || {}))) showToast("L'API Google Agenda n'est pas activée pour cette appli.");
+  else if (e && (e.status === 401 || e.message === "auth" || e.message === "popup_closed" || e.message === "popup_failed_to_open")) showToast("Reconnecte-toi à Google pour synchroniser.", "Se connecter", signIn);
+  else showToast("Pas pu synchroniser avec Google, réessaie.");
+}
+function enqueue(job){
+  pending++; renderG();
+  gq = gq.then(job).catch(gErr).finally(() => { pending--; renderG(); });
+  return gq;
+}
+function cacheSave(){ lsSet(CK, JSON.stringify([...events.values()])); }
+async function put(ev){
+  ev.updatedAt = new Date().toISOString(); events.set(ev.id, ev); render(); cacheSave();
+  enqueue(async () => {
+    const body = JSON.stringify(toG(ev));
+    if (known.has(ev.id)) {
+      try { await api(`/calendars/primary/events/${ev.id}`, { method: "PUT", body }); return; }
+      catch (e) { if (e.status !== 404) throw e; }
+    }
+    try { await api(`/calendars/primary/events`, { method: "POST", body: JSON.stringify({ ...toG(ev), id: ev.id }) }); }
+    catch (e) { if (e.status !== 409) throw e; await api(`/calendars/primary/events/${ev.id}`, { method: "PUT", body }); }
+    known.add(ev.id);
+  });
+}
+async function remove(id){
+  events.delete(id); render(); cacheSave();
+  enqueue(async () => {
+    try { await api(`/calendars/primary/events/${id}`, { method: "DELETE" }); }
+    catch (e) { if (e.status !== 404 && e.status !== 410) throw e; }
+    known.delete(id);
+  });
+}
+async function loadAll(){
+  let items = [], pt = "";
+  do {
+    const r = await api(`/calendars/primary/events?privateExtendedProperty=${encodeURIComponent("kalo=1")}&maxResults=2500&singleEvents=false&showDeleted=false&timeZone=${encodeURIComponent(TZ)}` + (pt ? "&pageToken=" + encodeURIComponent(pt) : ""));
+    items = items.concat(r.items || []); pt = r.nextPageToken || "";
+  } while (pt);
+  const m = new Map(); known.clear();
+  for (const g of items) { if (g.status === "cancelled") continue; const e = fromG(g); if (e) { m.set(e.id, e); known.add(e.id); } }
+  return m;
+}
+async function refresh(){
+  if (pending || !hasToken()) return;
+  try { events = await loadAll(); online = true; cacheSave(); render(); } catch (e) { if (e.status) gErr(e); }
+}
+function renderG(){
+  const s = $("gState"), b = $("signOut"); if (!s) return;
+  if (!online && !hasToken()) { s.textContent = ""; b.hidden = true; return; }
+  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""}`;
+  b.hidden = false;
+}
+function showLogin(mode){
+  $("login").hidden = false;
+  const t = $("loginTxt"), b = $("loginBtn");
+  if (mode === "config") { t.textContent = "Kalo n'est pas encore configuré (identifiant Google manquant dans config.js)."; b.hidden = true; }
+  else if (mode === "offline") { t.textContent = "Impossible de joindre Google. Vérifie ta connexion, puis recharge la page."; b.textContent = "Recharger"; b.hidden = false; b.onclick = () => location.reload(); }
+  else if (mode === "back") { t.textContent = "Content de te revoir. Reconnecte-toi pour retrouver ton agenda."; b.textContent = "Continuer avec Google"; b.hidden = false; b.onclick = signIn; }
+  else { b.hidden = false; b.onclick = signIn; }
+}
+async function signIn(){
+  try { await requestToken(""); await start(); }
+  catch (e) { showToast("Connexion annulée ou bloquée. Autorise les fenêtres pop-up pour Kalo."); }
+}
+async function start(){
+  $("login").hidden = true;
+  try { const c = await api("/calendars/primary"); account = c.id || ""; } catch (e) { gErr(e); }
+  await refresh(); renderG();
+}
+function signOut(){
+  try { if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token, () => {}); } catch {}
+  token = null; tokenExp = 0; online = false; account = ""; events = new Map(); known.clear();
+  lsDel(SK); lsDel("kalo-signed"); lsDel(CK); render(); renderG(); showLogin("first");
+}
+
+/* ---------- Occurrences ---------- */
+const rep = ev => ev.repeat || (ev.yearly ? "year" : null);
+const lastDay = (y,m) => new Date(y,m+1,0).getDate();
+function occ(ev, ref = today()){
+  if (!ev.date) return null;
+  const d0 = pISO(ev.date), r = rep(ev);
+  if (r === "month") {
+    const mk = (y,m) => new Date(y, m, Math.min(d0.getDate(), lastDay(y,m)));
+    let s = mk(ref.getFullYear(), ref.getMonth()); if (s < ref) s = mk(ref.getFullYear(), ref.getMonth()+1);
+    if (s < d0) s = d0; return { start:s, end:s };
+  }
+  if (r === "week") {
+    let s = new Date(Math.max(ref, d0)); while (s.getDay() !== d0.getDay()) s = addDays(s,1);
+    return { start:s, end:s };
+  }
+  if (r === "year") {
+    const make = y => mkDate(y, d0.getMonth()+1, d0.getDate()) || new Date(y,1,28);
+    let s = make(ref.getFullYear()); if (s < ref) s = make(ref.getFullYear()+1);
+    return { start:s, end:s };
+  }
+  return { start:d0, end: ev.end ? pISO(ev.end) : d0 };
+}
+function covers(ev, day){
+  if (!ev.date) return false;
+  const d0 = pISO(ev.date), r = rep(ev);
+  if (r === "year") return d0.getMonth() === day.getMonth() && d0.getDate() === day.getDate();
+  if (r === "month") return day >= d0 && day.getDate() === Math.min(d0.getDate(), lastDay(day.getFullYear(), day.getMonth()));
+  if (r === "week") return day >= d0 && day.getDay() === d0.getDay();
+  const e = ev.end ? pISO(ev.end) : d0; return day >= d0 && day <= e;
+}
+const sig = ev => [ev.title, ev.date, ev.end||"", ev.time||"", rep(ev) === "year" ? 1 : (rep(ev) || 0)].join("|");
+const stale = ev => ev.gcalSig && ev.gcalSig !== sig(ev);
+
+function countdown(o){
+  const t = today(), n = diff(o.start, t);
+  if (o.start <= t && o.end >= t) return o.end > o.start && o.start < t ? ["En cours", true] : ["Aujourd'hui", true];
+  if (n === 1) return ["Demain", true];
+  if (n < 0) return [`Il y a ${-n} j`, false];
+  return [`J-${n}`, false];
+}
+function dateLabel(ev, o){
+  const s = o.start, sameY = s.getFullYear() === today().getFullYear();
+  let txt = fmt(s, {weekday:"short", day:"numeric", month:"long", ...(sameY ? {} : {year:"numeric"})});
+  if (o.end > o.start) txt = `${fmt(s,{day:"numeric",month:"short"})} → ${fmt(o.end,{day:"numeric",month:"short"})}`;
+  return txt;
+}
+
+/* ---------- Rendu ---------- */
+let view = "list", showPast = false;
+try { view = localStorage.getItem("reperes-view") || "list"; } catch {}
+let mCursor = new Date(today().getFullYear(), today().getMonth(), 1), selDay = today();
+
+function evRow(ev, o){
+  const c = CATS[ev.cat] || CATS.perso, [cd, now] = countdown(o);
+  const meta = [];
+  if (o.end > o.start) meta.push(esc(dateLabel(ev,o)));
+  if (ev.time) meta.push(esc(ev.time.replace(":","h")));
+  if (rep(ev) === "year" && ev.birthYear) meta.push(`${o.start.getFullYear() - ev.birthYear} ans`);
+  if (ev.cat === "pro" && ev.client) meta.push(esc(ev.client));
+  meta.push(`<span style="display:inline-flex;gap:5px;align-items:center"><span class="dot" style="--c:${c.c}"></span>${c.label}</span>`);
+  if (ev.cat === "pro" && ev.status && ev.status !== "encours") meta.push(`<span class="st ${ev.status}">${ev.status === "livre" ? "Livré · à encaisser" : "Payé"}</span>`);
+  const RL = {year:"chaque année", month:"chaque mois", week:"chaque semaine"}; if (rep(ev)) meta.push(RL[rep(ev)]);
+  if (stale(ev)) meta.push(`<span class="warn">⚠️ modifié, mets à jour Google Agenda</span>`);
+  return `<button class="ev" data-id="${esc(ev.id)}" style="--c:${c.c}">
+    <span class="date"><b>${o.start.getDate()}</b><i>${esc(fmt(o.start,{month:"short"}).replace(".",""))}</i></span>
+    <span class="body"><span class="name">${esc(ev.title)}</span><span class="meta">${meta.join("<span aria-hidden='true'>·</span>")}</span></span>
+    <span class="cd${now?" now":""}">${cd}</span></button>`;
+}
+
+let filter = "all", query = "";
+const visible = () => [...events.values()].filter(e => filter === "all" || e.cat === filter);
+const matches = (e, q) => deacc([e.title, e.note, e.client, e.raw, (CATS[e.cat]||{}).label].join(" ").toLowerCase()).includes(q);
+
+function renderTodayBar(){
+  const t = today(), tm = addDays(t,1);
+  const on = d => [...events.values()].filter(e => covers(e,d)).sort((a,b) => (a.time||"99").localeCompare(b.time||"99"));
+  const item = e => `<button data-id="${esc(e.id)}"><span class="dot" style="--c:${(CATS[e.cat]||CATS.perso).c}"></span>${esc(e.title)}${e.time ? ` <span class="t">${esc(e.time.replace(":","h"))}</span>` : ""}</button>`;
+  const a = on(t), b = on(tm);
+  if (!events.size) { $("todayBar").innerHTML = ""; return; }
+  let h = `<span class="k">Aujourd'hui</span>` + (a.length ? a.map(item).join("") : `<span class="q">Rien de prévu.</span>`);
+  if (!a.length || b.length) h += b.length ? `<span class="k" style="margin-left:6px">Demain</span>${b.map(item).join("")}` : `<span class="q">Demain non plus.</span>`;
+  $("todayBar").innerHTML = `<div class="todaybar">${h}</div>`;
+}
+
+function renderPro(){
+  if (filter !== "pro") { $("proPanel").innerHTML = ""; return; }
+  const t = today(), pro = [...events.values()].filter(e => e.cat === "pro" && e.date);
+  const week = pro.filter(e => { const o = occ(e); return o.end >= t && diff(o.start,t) <= 7; }).length;
+  const unpaid = pro.filter(e => e.status === "livre");
+  const next = pro.map(e => [e, occ(e)]).filter(([e,o]) => o.start >= t && e.status !== "paye" && /\b(rendu|livraison|deadline|livrer)\b/.test(deacc(e.title.toLowerCase()))).sort((a,b) => a[1].start - b[1].start)[0];
+  $("proPanel").innerHTML = `<div class="propanel">
+    <div><b>${week}</b><span>cette semaine</span></div>
+    <div><b>${unpaid.length}</b><span>${unpaid.length ? esc(unpaid.slice(0,2).map(e => e.client || e.title).join(", ")) + (unpaid.length > 2 ? "…" : "") + " à encaisser" : "rien à encaisser"}</span></div>
+    <div><b>${next ? (diff(next[1].start,t) === 0 ? "Auj." : "J-" + diff(next[1].start,t)) : "—"}</b><span>${next ? "prochain rendu · " + esc(next[0].client || next[0].title) : "aucun rendu prévu"}</span></div>
+  </div>`;
+}
+
+function renderList(){
+  const t = today();
+  renderTodayBar(); renderPro();
+  const q = deacc(query.trim().toLowerCase());
+  if (q) {
+    const res = visible().filter(e => e.date && matches(e,q)).map(e => [e, occ(e)]).sort((a,b) => (b[1].end >= t) - (a[1].end >= t) || a[1].start - b[1].start);
+    $("nextCard").innerHTML = "";
+    $("timeline").innerHTML = res.length
+      ? `<div class="group"><h2>Résultats<span class="n">${res.length}</span></h2>${res.map(([e,o]) => evRow(e,o)).join("")}</div>`
+      : `<div class="empty"><h3>Aucun résultat</h3>Rien ne correspond à « ${esc(query.trim())} ».</div>`;
+    return;
+  }
+  const all = visible().filter(e => e.date).map(e => [e, occ(e)]);
+  const up = all.filter(([e,o]) => o.end >= t).sort((a,b) => a[1].start - b[1].start || (a[0].time||"99").localeCompare(b[0].time||"99"));
+  const past = all.filter(([e,o]) => o.end < t).sort((a,b) => b[1].start - a[1].start);
+
+  const nxt = up.find(([e,o]) => ["sortie","voyage","anniv"].includes(e.cat) && diff(o.start,t) >= 1 && diff(o.start,t) <= 120);
+  if (nxt) {
+    const [e,o] = nxt, c = CATS[e.cat], n = diff(o.start,t);
+    $("nextCard").innerHTML = `<div class="next" data-id="${esc(e.id)}" style="--c:${c.c}" role="button" tabindex="0">
+      <div><div class="lbl">Prochain moment</div><div class="t">${esc(e.title)}</div><div class="d">${esc(dateLabel(e,o))}</div></div>
+      <div class="big">${n}<small>${n > 1 ? "jours" : "jour"}</small></div></div>`;
+  } else $("nextCard").innerHTML = "";
+
+  if (filter === "pro" && !all.length && events.size) {
+    $("timeline").innerHTML = `<div class="empty"><h3>Aucun événement pro</h3></div>`;
+    return;
+  }
+  if (!events.size) {
+    $("timeline").innerHTML = `<div class="empty"><h3>Rien de prévu</h3></div>`;
+    return;
+  }
+  const groups = [["Aujourd'hui",[]],["Cette semaine",[]],["Dans le mois",[]],["Plus tard",[]]];
+  for (const p of up) { const n = diff(p[1].start, t); groups[n <= 0 ? 0 : n <= 7 ? 1 : n <= 31 ? 2 : 3][1].push(p); }
+  let h = groups.filter(g => g[1].length).map(([name, list]) => `<div class="group"><h2>${name}<span class="n">${list.length}</span></h2>${list.map(([e,o]) => evRow(e,o)).join("")}</div>`).join("");
+  if (!up.length) h = `<div class="empty"><h3>Rien à venir</h3></div>`;
+  if (past.length) h += showPast
+    ? `<div class="group"><h2>Passés<span class="n">${past.length}</span></h2>${past.map(([e,o]) => evRow(e,o)).join("")}</div><button class="pastbtn" id="pastBtn">Masquer les événements passés</button>`
+    : `<button class="pastbtn" id="pastBtn">Voir les événements passés (${past.length})</button>`;
+  $("timeline").innerHTML = h;
+}
+
+function renderMonth(){
+  $("mTitle").textContent = fmt(mCursor,{month:"long",year:"numeric"});
+  const t = today(), first = mCursor, off = (first.getDay()+6)%7;
+  let h = "";
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(first, i - off);
+    if (i >= 35 && d.getMonth() !== first.getMonth()) break;
+    const evs = visible().filter(e => covers(e,d));
+    const dcats = [...new Set(evs.map(e => e.cat))];
+    const dots = dcats.slice(0,3).map(k => `<i style="--c:${(CATS[k]||CATS.perso).c}"></i>`).join("");
+    const sty = evs.length ? ` style="--c:${(CATS[evs[0].cat]||CATS.perso).c}"` : "";
+    const cls = ["day", d.getMonth() !== first.getMonth() ? "out" : "", +d === +t ? "today" : "", evs.length ? "has" : ""].join(" ");
+    h += `<button class="${cls}"${sty} data-day="${iso(d)}" aria-pressed="${+d === +selDay}" aria-label="${esc(fmt(d,{weekday:"long",day:"numeric",month:"long"}))}${evs.length ? `, ${evs.length} événement${evs.length>1?"s":""}` : ""}">${d.getDate()}<span class="dots">${dots}</span></button>`;
+  }
+  $("days").innerHTML = h;
+  $("legend").innerHTML = Object.entries(CATS).map(([k,c]) => `<button type="button" data-legend="${k}" style="--c:${c.c}" aria-pressed="${filter === k}" title="Afficher seulement : ${esc(c.label)}"><span class="dot"></span>${c.label}</button>`).join("");
+  const list = visible().filter(e => covers(e, selDay)).map(e => [e, rep(e) ? {start: selDay, end: selDay} : occ(e)]).sort((a,b) => (a[0].time||"99").localeCompare(b[0].time||"99"));
+  $("dayList").innerHTML = `<h3>${esc(fmt(selDay,{weekday:"long",day:"numeric",month:"long"}))}</h3>` +
+    (list.length ? list.map(([e,o]) => evRow(e,o)).join("") : `<div class="none">Rien ce jour-là.</div>`) +
+    `<button class="quick" data-newday="${iso(selDay)}">+ Ajouter un événement ce jour</button>`;
+}
+
+function render(){
+  $("todayLabel").textContent = fmt(new Date(),{weekday:"long",day:"numeric",month:"long"});
+  $("vList").setAttribute("aria-pressed", view === "list"); $("vMonth").setAttribute("aria-pressed", view === "month");
+  $("listCol").hidden = view !== "list"; $("monthCol").hidden = view !== "month";
+  renderList(); renderMonth(); renderG();
+}
+
+/* ---------- Saisie rapide ---------- */
+let draft = null;
+function updatePreview(){
+  const v = $("q").value.trim();
+  draft = v ? parse(v) : null;
+  $("addBtn").disabled = !draft || !draft.title;
+  if (!draft) { $("preview").innerHTML = ""; return; }
+  const c = CATS[draft.cat];
+  const chips = [`<span class="chip title">${esc(draft.title || "…")}</span>`];
+  if (draft.date) { const o = occ(draft); chips.push(`<span class="chip">${esc(dateLabel(draft,o))}</span>`); } else chips.push(`<span class="chip missing">Pas de date, tu la choisiras</span>`);
+  if (draft.time) chips.push(`<span class="chip">${esc(draft.time.replace(":","h"))}</span>`);
+  const RL = {year:"chaque année", month:"chaque mois", week:"chaque semaine"};
+  if (draft.repeat) chips.push(`<span class="chip">${RL[draft.repeat]}${draft.birthYear ? ` · ${occ(draft).start.getFullYear()-draft.birthYear} ans` : ""}</span>`);
+  if (draft.client) chips.push(`<span class="chip">Client : ${esc(draft.client)}</span>`);
+  chips.push(`<span class="chip"><span class="dot" style="--c:${c.c}"></span>${c.label}</span>`);
+  $("preview").innerHTML = chips.join("");
+}
+$("q").addEventListener("input", updatePreview);
+$("composer").addEventListener("submit", e => {
+  e.preventDefault(); if (!draft || !draft.title) return;
+  const ev = { id: uid(), raw: $("q").value.trim(), ...draft, note: "", createdAt: new Date().toISOString() };
+  $("q").value = ""; updatePreview();
+  if (!ev.date) { ev.date = iso(today()); openSheet(ev, true); return; }
+  put(ev);
+  const o = occ(ev); mCursor = new Date(o.start.getFullYear(), o.start.getMonth(), 1); selDay = o.start; render();
+  showToast(`Ajouté : ${ev.title}`, "Modifier", () => openSheet(events.get(ev.id)));
+});
+
+/* ---------- Feuille d'édition ---------- */
+let cur = null, isNew = false, delArmed = false;
+function openSheet(ev, fresh = false){
+  cur = {...ev}; isNew = fresh; delArmed = false;
+  $("sTitle").textContent = fresh ? "Nouvel événement" : "Modifier";
+  $("fTitle").value = cur.title || ""; $("fDate").value = cur.date || ""; $("fTime").value = cur.time || "";
+  $("fEnd").value = cur.end || ""; $("fBirth").value = cur.birthYear || ""; $("fRepeat").value = rep(cur) || ""; $("fNote").value = cur.note || "";
+  $("fClient").value = cur.client || ""; $("fStatus").value = cur.status || "encours"; $("proFields").hidden = cur.cat !== "pro";
+  $("delBtn").hidden = fresh; $("delBtn").classList.remove("armed"); $("delBtn").textContent = "Supprimer";
+  renderCats(); syncGcal();
+  $("backdrop").hidden = false; $("sheet").hidden = false;
+  setTimeout(() => (fresh && !cur.date ? $("fDate") : $("fTitle")).focus(), 30);
+}
+function closeSheet(){ $("backdrop").hidden = true; $("sheet").hidden = true; cur = null; }
+function renderCats(){
+  $("proFields").hidden = cur.cat !== "pro";
+  $("fCats").innerHTML = Object.entries(CATS).map(([k,c]) => `<button type="button" data-cat="${k}" style="--c:${c.c}" aria-pressed="${cur.cat === k}"><span class="dot"></span>${c.label}</button>`).join("");
+}
+function readForm(){
+  return {...cur, title: $("fTitle").value.trim() || "Sans titre", date: $("fDate").value || null, time: $("fTime").value || null,
+    end: ($("fEnd").value && $("fEnd").value > $("fDate").value) ? $("fEnd").value : null,
+    birthYear: +$("fBirth").value || null, repeat: $("fRepeat").value || null, yearly: $("fRepeat").value === "year", note: $("fNote").value.trim(),
+    ...(cur.cat === "pro" ? { client: $("fClient").value.trim(), status: $("fStatus").value } : {})};
+}
+function syncGcal(){
+  const f = readForm();
+  $("gNote").className = "gnote";
+  $("gNote").textContent = `Synchronisé avec ton Google Agenda · rappels : ${remText(f)}.`;
+}
+["fTitle","fDate","fTime","fEnd","fRepeat","fBirth","fNote","fClient","fStatus"].forEach(id => $(id).addEventListener("input", syncGcal));
+$("fCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; cur.cat = b.dataset.cat; if (cur.cat === "pro" && !cur.status) cur.status = "encours"; renderCats(); });
+$("saveBtn").addEventListener("click", () => {
+  const ev = readForm(); if (!ev.date) { $("fDate").focus(); showToast("Choisis une date."); return; }
+  put(ev); closeSheet(); showToast(isNew ? `Ajouté : ${ev.title}` : "Enregistré");
+});
+$("delBtn").addEventListener("click", () => {
+  if (!delArmed) { delArmed = true; $("delBtn").classList.add("armed"); $("delBtn").textContent = "Confirmer la suppression"; return; }
+  const old = events.get(cur.id); remove(cur.id); closeSheet();
+  showToast("Supprimé", "Annuler", () => old && put({...old}));
+});
+$("backdrop").addEventListener("click", closeSheet);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
+
+/* ---------- Navigation ---------- */
+document.addEventListener("click", e => {
+  const lg = e.target.closest("[data-legend]"); if (lg) { setFilter(filter === lg.dataset.legend ? "all" : lg.dataset.legend); return; }
+  const ev = e.target.closest("[data-id]"); if (ev && events.has(ev.dataset.id)) { openSheet(events.get(ev.dataset.id)); return; }
+  const ex = e.target.closest("[data-ex]"); if (ex) { $("q").value = ex.dataset.ex; updatePreview(); $("q").focus(); return; }
+  const day = e.target.closest("[data-day]"); if (day) { selDay = pISO(day.dataset.day); if (selDay.getMonth() !== mCursor.getMonth()) mCursor = new Date(selDay.getFullYear(), selDay.getMonth(), 1); renderMonth(); return; }
+  const nd = e.target.closest("[data-newday]"); if (nd) { openSheet({id: uid(), title:"", cat:"perso", date: nd.dataset.newday, yearly:false, note:"", createdAt: new Date().toISOString()}, true); return; }
+  if (e.target.id === "pastBtn") { showPast = !showPast; renderList(); }
+});
+$("nextCard").addEventListener("keydown", e => { if (e.key === "Enter") e.target.click(); });
+const setView = v => { view = v; try { localStorage.setItem("reperes-view", v); } catch {} render(); };
+$("s").addEventListener("input", e => { query = e.target.value; if (query.trim() && view === "month" && innerWidth < 900) setView("list"); else renderList(); });
+function setFilter(f){
+  filter = f; document.querySelectorAll(".seg.filt button").forEach(x => x.setAttribute("aria-pressed", x.dataset.f === f));
+  try { localStorage.setItem("kalo-filter", f === "pro" ? "pro" : "all"); } catch {} render();
+}
+document.querySelectorAll(".seg.filt button").forEach(b => b.addEventListener("click", () => setFilter(b.dataset.f)));
+try { const f = localStorage.getItem("kalo-filter"); if (f === "pro") document.querySelector('.seg.filt [data-f="pro"]').click(); } catch {}
+$("vList").addEventListener("click", () => setView("list"));
+$("vMonth").addEventListener("click", () => setView("month"));
+$("mPrev").addEventListener("click", () => { mCursor = new Date(mCursor.getFullYear(), mCursor.getMonth()-1, 1); renderMonth(); });
+$("mNext").addEventListener("click", () => { mCursor = new Date(mCursor.getFullYear(), mCursor.getMonth()+1, 1); renderMonth(); });
+$("mToday").addEventListener("click", () => { selDay = today(); mCursor = new Date(selDay.getFullYear(), selDay.getMonth(), 1); renderMonth(); });
+
+/* ---------- Toast ---------- */
+let tt;
+function showToast(msg, act, fn){
+  const el = $("toast"); el.innerHTML = `<span>${esc(msg)}</span>${act ? `<button type="button">${esc(act)}</button>` : ""}`;
+  if (act) el.querySelector("button").onclick = () => { el.hidden = true; fn && fn(); };
+  el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 4200);
+}
+
+/* ---------- Démarrage ---------- */
+$("signOut").addEventListener("click", () => { if (confirm("Se déconnecter de Kalo sur cet appareil ?")) signOut(); });
+try { (JSON.parse(lsGet(CK) || "[]")).forEach(e => events.set(e.id, e)); } catch {}
+render(); renderG();
+(async () => {
+  if (!CFG.clientId || /^VOTRE|^YOUR/i.test(CFG.clientId)) { showLogin("config"); return; }
+  if (!(await loadGsi())) { if (events.size) { $("gState").textContent = "Hors connexion"; return; } showLogin("offline"); return; }
+  if (hasToken()) { await start(); }
+  else if (signedBefore()) { showLogin("back"); try { await requestToken("none"); await start(); } catch {} }
+  else showLogin("first");
+})();
+// un premier geste après expiration (1 h) renouvelle la session sans pop-up supplémentaire
+document.addEventListener("pointerdown", () => {
+  if (signedBefore() && !hasToken() && window.google?.accounts?.oauth2 && !authWait && $("login").hidden) ensureToken().then(() => refresh()).catch(() => {});
+}, true);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
+window.addEventListener("online", refresh);
+setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 90000);
+setInterval(() => { if (iso(today()) !== $("todayLabel").dataset.d) { $("todayLabel").dataset.d = iso(today()); render(); } }, 60000);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
