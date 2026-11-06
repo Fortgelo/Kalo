@@ -791,7 +791,7 @@ async function refresh(){
 function renderG(){
   const s = $("gState"), b = $("signOut"); if (!s) return;
   if (!online && !hasToken()) { s.textContent = ""; b.hidden = true; return; }
-  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""} · v5`;
+  s.textContent = pending ? "Synchronisation…" : `Synchronisé avec Google Agenda${account ? " · " + account : ""} · v6`;
   b.hidden = false;
 }
 function showLogin(mode){
@@ -954,14 +954,24 @@ dayRender();
   const b = $("miniBtn"); if (!b || !matchMedia("(hover:hover)").matches) return;
   b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="12" height="14" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2"/></svg>';
   b.hidden = false;
-  let prev = null;
-  b.addEventListener("click", () => {
-    if (!matchMedia("(display-mode: standalone)").matches && !matchMedia("(display-mode: window-controls-overlay)").matches) { showToast("Réduis la fenêtre à la main : Kalo s'adapte tout seul."); return; }
-    try {
-      if (!prev && outerWidth > 560) { prev = [outerWidth, outerHeight]; resizeTo(420, Math.min(780, screen.availHeight - 40)); }
-      else if (prev) { resizeTo(prev[0], prev[1]); prev = null; }
-      else showToast("Agrandis la fenêtre à la main pour revenir à la vue complète.");
-    } catch { showToast("Réduis la fenêtre à la main : Kalo s'adapte tout seul."); }
+  const isMini = window.name === "kalo-mini";
+  if (isMini) b.title = "Fermer la fenêtre réduite";
+  const W = 420, H = Math.min(780, screen.availHeight - 40);
+  const popup = () => {
+    const w = open(location.href.split("#")[0], "kalo-mini", "popup=yes,width=" + W + ",height=" + H + ",left=" + (screen.availWidth - W - 20) + ",top=20");
+    if (!w) showToast("Fenêtre bloquée : autorise les pop-ups pour Kalo, ou réduis la fenêtre à la main.");
+  };
+  b.addEventListener("click", async () => {
+    if (isMini) { close(); return; }
+    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch {} await new Promise(r => setTimeout(r, 350)); }
+    const standalone = matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: window-controls-overlay)").matches;
+    if (standalone) {
+      const w0 = outerWidth;
+      try { resizeTo(W, H); } catch {}
+      await new Promise(r => setTimeout(r, 400));
+      if (Math.abs(outerWidth - w0) > 40) return;
+    }
+    popup();
   });
 })();
 
