@@ -226,6 +226,9 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 [hidden]{display:none!important}
+.hello details.how{margin:10px 0 8px;font-size:13px}.hello details.how summary{cursor:pointer;color:var(--accent)}.hello details.how ol{margin:8px 0 0;padding-left:18px;color:var(--muted);line-height:1.5}.hello details.how a{color:var(--accent)}
+.keyrow{display:flex;gap:6px;margin-top:8px}.keyrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--fg);padding:8px 10px;font-size:13px}.keyrow button{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;color:var(--fg);padding:8px 10px;font-size:12.5px}
+.keymsg{font-size:12px;color:var(--muted);margin-top:6px}.keymsg.err{color:var(--danger)}.linkbtn{display:block;background:none;border:0;color:var(--faint);font-size:12px;margin-top:12px;padding:0;text-decoration:underline;cursor:pointer}
 .login{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:24px}
 .logincard{max-width:380px;text-align:left}
 .logincard .brand{font-size:44px;margin:0 0 14px}
@@ -317,6 +320,12 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
     <button class="btn danger" id="delBtn" type="button">Supprimer</button>
   </div>
   <p class="gnote" id="gNote"></p>
+</div>
+<button class="fab" id="fab" type="button" aria-label="Demander à Kalo" title="Demander à Kalo" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg></button>
+<div class="chat" id="chat" role="dialog" aria-label="Discussion avec Kalo" hidden>
+  <div class="chathead"><h2>Demander à Kalo</h2><button type="button" id="chatClear" aria-label="Nouvelle discussion" title="Nouvelle discussion"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button><button type="button" id="chatClose" aria-label="Fermer" title="Fermer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="msgs" id="msgs" aria-live="polite"></div>
+  <form class="chatin" id="chatForm"><textarea id="chatIn" rows="1" placeholder="Demande quelque chose…" aria-label="Message"></textarea><button id="chatSend" type="submit" aria-label="Envoyer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>
 </div>
 <div class="login" id="login" hidden>
   <div class="logincard">
@@ -941,7 +950,191 @@ function showToast(msg, act, fn){
   el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 4200);
 }
 
+/* ---------- Clé Claude (facultative) ---------- */
+const AK = "kalo-akey", AMODEL = "claude-haiku-5-5";
+class AiErr extends Error { constructor(code){ super(code); this.code = code; } }
+async function aiCall(key, body, signal){
+  let r;
+  try { r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", signal,
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: AMODEL, ...body }) }); }
+  catch (e) { if (e && e.name === "AbortError") throw e; throw new AiErr("network"); }
+  if (r.ok) return r.json();
+  let m = ""; try { m = (await r.json())?.error?.message || ""; } catch {}
+  if (r.status === 401 || r.status === 403) throw new AiErr("badkey");
+  if (r.status === 429) throw new AiErr("rate");
+  if (/credit balance|billing/i.test(m)) throw new AiErr("credit");
+  if (r.status === 404) throw new AiErr("model");
+  throw new AiErr("other");
+}
+async function aiJson(input, signal){
+  const key = lsGet(AK); if (!key) throw new AiErr("nokey");
+  const system = input[0].content, messages = input.slice(1).map(m => ({ role: m.role, content: m.content }));
+  const r = await aiCall(key, { max_tokens: 2000, system, messages }, signal);
+  const txt = (r.content || []).map(c => c.text || "").join("");
+  const i = txt.indexOf("{"), j = txt.lastIndexOf("}");
+  if (i < 0 || j <= i) throw new AiErr("json");
+  try { return JSON.parse(txt.slice(i, j + 1)); } catch { throw new AiErr("json"); }
+}
+function aiErrText(e){
+  return { badkey: "Clé refusée. Vérifie-la ou remets-en une.", credit: "Crédit épuisé sur ton compte Anthropic. Ajoute quelques euros sur console.anthropic.com.",
+    rate: "Trop de demandes d'un coup, réessaie dans un instant.", model: "Modèle indisponible pour cette clé.", json: "Réponse illisible, renvoie ton message.",
+    network: "Petit souci de connexion, réessaie.", nokey: "Ajoute ta clé pour utiliser le chat." }[e && e.code] || "Petit souci, réessaie.";
+}
+document.addEventListener("click", async e => {
+  if (e.target.id === "keyRm") { lsDel(AK); chatTurns = []; chatHello(); showToast("Clé retirée de cet appareil."); return; }
+  if (e.target.id !== "keySave") return;
+  const k = $("keyIn").value.trim(), msg = $("keyMsg");
+  if (!/^sk-ant-/.test(k)) { msg.className = "keymsg err"; msg.textContent = "Une clé commence par sk-ant-… Vérifie ce que tu as copié."; return; }
+  e.target.disabled = true; msg.className = "keymsg"; msg.textContent = "Vérification…";
+  try { await aiCall(k, { max_tokens: 5, messages: [{ role: "user", content: "ok" }] }); lsSet(AK, k); chatHello(); showToast("Chat activé."); }
+  catch (er) { msg.className = "keymsg err"; msg.textContent = aiErrText(er); e.target.disabled = false; }
+});
+/* ---------- Discussion IA ---------- */
+let chatTurns = [], chatCtl = null, busy = false;
+const RULES = `Tu es l'assistant intégré à Kalo, l'agenda personnel de l'utilisateur (graphiste 3D freelance). Tu tutoies, tu réponds en français, court et naturel.
+Tu réponds UNIQUEMENT avec un objet JSON : {"reply": string, "actions": array}.
+"reply" : ta réponse à afficher. Si tu proposes des actions, décris-les brièvement ("Je te propose de…") sans dire que c'est fait : l'utilisateur doit confirmer.
+"actions" (vide si c'est juste une question) peut contenir :
+- {"op":"add","event":{"title":string,"cat":string,"date":"YYYY-MM-DD","end":"YYYY-MM-DD"|null,"time":"HH:MM"|null,"repeat":"week"|"month"|"year"|null,"client":string,"status":"encours"|"livre"|"paye","note":string,"birthYear":number|null}}
+- {"op":"update","id":string,"changes":{mêmes champs que event, seulement ceux qui changent}}
+- {"op":"delete","ids":[string,...]}
+- {"op":"delete_all"} pour tout effacer.
+cat parmi : anniv, sortie, voyage, pro, sante, admin, perso. Un anniversaire = cat "anniv", repeat "year", titre "Anniversaire de Prénom". Titres courts, bien écrits, sans la date. client et status seulement pour cat "pro" ("livre" = livré mais pas encore payé).
+N'utilise que des id présents dans la liste fournie. "next" est la prochaine occurrence, "passed" indique un événement terminé. Calcule les dates à partir de la date du jour donnée.
+Si la demande est ambiguë, pose une courte question dans reply, sans action.`;
+
+function evDigest(){
+  const t = today();
+  return [...events.values()].filter(e => e.date).slice(0, 500).map(e => {
+    const o = occ(e), x = {id:e.id, title:e.title, cat:e.cat, date:e.date};
+    if (e.end) x.end = e.end; if (e.time) x.time = e.time; if (rep(e)) x.repeat = rep(e);
+    if (e.cat === "pro") { x.client = e.client || ""; x.status = e.status || "encours"; }
+    if (e.birthYear) x.birthYear = e.birthYear; if (e.note) x.note = e.note.slice(0,160);
+    x.next = iso(o.start); if (o.end < t) x.passed = true; return x;
+  });
+}
+const okDate = v => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(pISO(v)) && iso(pISO(v)) === v;
+function cleanFields(src, partial){
+  const o = {};
+  const has = k => Object.prototype.hasOwnProperty.call(src, k);
+  if (has("title") && String(src.title||"").trim()) o.title = String(src.title).trim().slice(0,120);
+  if (has("cat") && CATS[src.cat]) o.cat = src.cat;
+  if (has("date") && okDate(src.date)) o.date = src.date;
+  if (has("end")) o.end = okDate(src.end) ? src.end : null;
+  if (has("time")) o.time = (typeof src.time === "string" && /^\d{2}:\d{2}$/.test(src.time)) ? src.time : null;
+  if (has("repeat")) { o.repeat = ["week","month","year"].includes(src.repeat) ? src.repeat : null; o.yearly = o.repeat === "year"; }
+  if (has("client")) o.client = String(src.client||"").slice(0,80);
+  if (has("status") && ["encours","livre","paye"].includes(src.status)) o.status = src.status;
+  if (has("note")) o.note = String(src.note||"").slice(0,1000);
+  if (has("birthYear")) o.birthYear = Number.isInteger(+src.birthYear) && +src.birthYear > 1900 ? +src.birthYear : null;
+  return o;
+}
+function buildPlan(actions){
+  const plan = {adds:[], updates:[], dels:new Set()};
+  if (!Array.isArray(actions)) return plan;
+  for (const a of actions.slice(0,200)) {
+    if (!a || typeof a !== "object") continue;
+    if (a.op === "delete_all") [...events.keys()].forEach(id => plan.dels.add(id));
+    else if (a.op === "delete" && Array.isArray(a.ids)) a.ids.forEach(id => events.has(String(id)) && plan.dels.add(String(id)));
+    else if (a.op === "add" && a.event && typeof a.event === "object") {
+      const f = cleanFields(a.event); if (!f.title || !f.date) continue;
+      if (f.end && f.end <= f.date) f.end = null;
+      const ev = { id: uid(), cat:"perso", note:"", repeat:null, yearly:false, ...f, createdAt: new Date().toISOString() };
+      if (ev.cat === "pro") { ev.client = ev.client || ""; ev.status = ev.status || "encours"; }
+      plan.adds.push(ev);
+    } else if (a.op === "update" && events.has(String(a.id)) && a.changes && typeof a.changes === "object") {
+      const old = events.get(String(a.id)), f = cleanFields(a.changes);
+      if (!Object.keys(f).length) continue;
+      const nx = {...old, ...f}; if (nx.end && nx.end <= nx.date) nx.end = null;
+      plan.updates.push([old, nx]);
+    }
+  }
+  plan.updates = plan.updates.filter(([o]) => !plan.dels.has(o.id));
+  return plan;
+}
+const planSize = p => p.adds.length + p.updates.length + p.dels.size;
+function planHTML(p){
+  const li = [];
+  const short = e => `${esc(e.title)} <span style="color:var(--muted)">· ${esc(dateLabel(e, occ(e)))}</span>`;
+  p.adds.slice(0,8).forEach(e => li.push(`<li><b class="add">Ajouter</b><span>${short(e)}</span></li>`));
+  if (p.adds.length > 8) li.push(`<li><b class="add">Ajouter</b><span>+ ${p.adds.length-8} autres</span></li>`);
+  const FL = {title:"titre",date:"date",end:"fin",time:"heure",repeat:"répétition",client:"client",status:"statut",note:"note",cat:"catégorie",birthYear:"année de naissance"};
+  p.updates.slice(0,8).forEach(([o,n]) => { const ch = Object.keys(FL).filter(k => (o[k]??null) !== (n[k]??null)).map(k => FL[k]); li.push(`<li><b class="upd">Modifier</b><span>${esc(o.title)}${n.title !== o.title ? ` → ${esc(n.title)}` : ""} <span style="color:var(--muted)">· ${esc(ch.join(", ") || "détails")}</span></span></li>`); });
+  if (p.updates.length > 8) li.push(`<li><b class="upd">Modifier</b><span>+ ${p.updates.length-8} autres</span></li>`);
+  const d = [...p.dels].map(id => events.get(id)).filter(Boolean);
+  if (d.length && d.length <= 6) d.forEach(e => li.push(`<li><b class="del">Supprimer</b><span>${esc(e.title)}</span></li>`));
+  else if (d.length) li.push(`<li><b class="del">Supprimer</b><span>${d.length} événements (${esc(d.slice(0,3).map(e => e.title).join(", "))}…)</span></li>`);
+  return `<ul>${li.join("")}</ul><div class="pa"><button type="button" class="ok${p.dels.size ? " danger" : ""}">Confirmer</button><button type="button" class="no">Annuler</button></div>`;
+}
+async function applyPlan(p){
+  const before = new Map();
+  p.adds.forEach(e => before.set(e.id, null));
+  p.updates.forEach(([o]) => before.set(o.id, o));
+  [...p.dels].forEach(id => before.set(id, events.get(id)));
+  p.adds.forEach(e => put(e));
+  p.updates.forEach(([o, n]) => put(n));
+  [...p.dels].forEach(id => remove(id));
+  const n = planSize(p);
+  showToast(`${n} changement${n>1?"s":""} appliqué${n>1?"s":""}`, "Annuler", () => { before.forEach((old, id) => { if (old) put({...old}); else remove(id); }); showToast("Annulé"); });
+}
+function bubble(cls, html){ const el = document.createElement("div"); el.className = "msg " + cls; el.innerHTML = html; $("msgs").append(el); $("msgs").scrollTop = $("msgs").scrollHeight; return el; }
+function chatHello(){
+  if (!lsGet(AK)) {
+    $("msgs").innerHTML = `<div class="hello">Le chat est optionnel : il utilise ta propre clé Claude (quelques centimes par jour).
+      <details class="how"><summary>Comment faire ?</summary><ol>
+        <li>Va sur <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>, crée un compte et ajoute quelques euros de crédit.</li>
+        <li>Dans « API Keys », crée une clé et copie-la.</li>
+        <li>Colle-la ci-dessous.</li></ol></details>
+      <div class="keyrow"><input id="keyIn" type="password" placeholder="Colle ta clé ici" autocomplete="off" spellcheck="false"><button type="button" id="keySave">Tester et enregistrer</button></div>
+      <div class="keymsg" id="keyMsg" aria-live="polite"></div></div>`;
+    return;
+  }
+  $("msgs").innerHTML = `<div class="hello">Une question, des ajouts en série ou du ménage : rien n'est modifié sans ta confirmation.
+    <div class="ex">${["Qu'est-ce que j'ai cette semaine ?","Qui me doit encore de l'argent ?","Supprime les événements passés"].map(x => `<button type="button" data-ask="${esc(x)}">${esc(x)}</button>`).join("")}</div>
+    <button type="button" class="linkbtn" id="keyRm">Retirer ma clé</button></div>`;
+}
+const ICON_SEND = $("chatSend").innerHTML, ICON_STOP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+function setBusy(b){ busy = b; $("chatSend").innerHTML = b ? ICON_STOP : ICON_SEND; $("chatSend").setAttribute("aria-label", b ? "Arrêter" : "Envoyer"); $("chatSend").classList.toggle("stop", b); }
+async function sendChat(text){
+  text = text.trim(); if (!text) return; if (!lsGet(AK)) { chatHello(); return; }
+  $("msgs").querySelector(".hello")?.remove();
+  bubble("me", esc(text)); $("chatIn").value = ""; autoGrow();
+  const wait = bubble("ai wait", "Réfléchit…");
+  chatCtl = new AbortController(); setBusy(true);
+  const input = [{role:"user", content: RULES}, ...chatTurns.slice(-8),
+    {role:"user", content: `Aujourd'hui : ${fmt(new Date(),{weekday:"long",day:"numeric",month:"long",year:"numeric"})} (${iso(today())}).\nÉvénements (JSON) : ${JSON.stringify(evDigest())}\n\nMessage de l'utilisateur : ${text}`}];
+  try {
+    const r = await aiJson(input, chatCtl.signal);
+    const reply = String(r?.reply ?? "").trim();
+    const plan = buildPlan(r?.actions);
+    wait.classList.remove("wait"); wait.innerHTML = esc(reply || (planSize(plan) ? "Voilà ce que je te propose :" : "Je n'ai pas compris, tu peux reformuler ?"));
+    chatTurns.push({role:"user", content:text}, {role:"assistant", content: reply || "(actions proposées)"});
+    if (planSize(plan)) {
+      const box = document.createElement("div"); box.className = "plan"; box.innerHTML = planHTML(plan); wait.append(box);
+      box.querySelector(".ok").onclick = async () => { box.querySelector(".pa").remove(); box.insertAdjacentHTML("beforeend", `<div class="done">Appliqué.</div>`); await applyPlan(plan); chatTurns.push({role:"user", content:"(J'ai confirmé, c'est appliqué.)"}); };
+      box.querySelector(".no").onclick = () => { box.querySelector(".pa").remove(); box.insertAdjacentHTML("beforeend", `<div class="done">Annulé, rien n'a changé.</div>`); chatTurns.push({role:"user", content:"(J'ai refusé ces actions, rien n'a été fait.)"}); };
+      $("msgs").scrollTop = $("msgs").scrollHeight;
+    }
+  } catch (e) {
+    wait.classList.remove("wait");
+    if (e?.name === "AbortError" || e?.code === "cancelled") wait.textContent = "Arrêté.";
+    else { wait.classList.add("err"); wait.textContent = aiErrText(e); }
+  } finally { setBusy(false); chatCtl = null; }
+}
+function autoGrow(){ const t = $("chatIn"); t.style.height = "36px"; if (t.scrollHeight > 38) t.style.height = Math.min(t.scrollHeight + 2, 96) + "px"; t.style.overflow = t.scrollHeight > 96 ? "auto" : "hidden"; }
+$("chatIn").addEventListener("input", autoGrow);
+$("chatIn").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && innerWidth >= 700) { e.preventDefault(); $("chatForm").requestSubmit(); } });
+$("chatForm").addEventListener("submit", e => { e.preventDefault(); if (busy) { chatCtl?.abort(); return; } sendChat($("chatIn").value); });
+$("msgs").addEventListener("click", e => { const b = e.target.closest("[data-ask]"); if (b && !busy) sendChat(b.dataset.ask); });
+$("fab").addEventListener("click", () => { if (!$("chat").hidden) { $("chatClose").click(); return; } $("chat").hidden = false; if (!$("msgs").children.length) chatHello(); setTimeout(() => $("chatIn").focus(), 30); });
+$("chatClose").addEventListener("click", () => { $("chat").hidden = true; });
+$("chatClear").addEventListener("click", () => { chatCtl?.abort(); chatTurns = []; chatHello(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("chat").hidden && $("sheet").hidden) $("chatClose").click(); });
+
+
 /* ---------- Démarrage ---------- */
+$("fab").hidden = false;
 $("signOut").addEventListener("click", () => { if (confirm("Se déconnecter de Kalo sur cet appareil ?")) signOut(); });
 try { (JSON.parse(lsGet(CK) || "[]")).forEach(e => events.set(e.id, e)); } catch {}
 render(); renderG();
